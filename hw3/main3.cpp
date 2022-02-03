@@ -5,6 +5,7 @@
 //(main memory) and print them when filled up.
 //And continue this process untill the full Emp.csv is read.
 
+#include <cassert>
 #include <bits/stdc++.h>
 using namespace std;
 
@@ -20,8 +21,10 @@ struct EmpRecord {
 
 EmpRecord buffers[buffer_size]; // this structure contains 22 buffers;
                                 // available as your main memory.
-unsigned int temp_file_id = 0; // keeps track of the number of temp
+unsigned int temp_file_count = 0; // keeps track of the number of temp
                                // files generated.
+fstream temp_files[buffer_size]; //
+
 
 // Grab a single block from the Emp.csv file, in theory if a block was larger than
 // one tuple, this function would return an array of EmpRecords and the entire if
@@ -87,22 +90,21 @@ void bubbleSort(EmpRecord* emp, int size) {
 //You can change return type and arguments as you want.
 void Sort_in_Main_Memory(){
     //cout << "Sorting Not Implemented\n" << endl;
-    string str = to_string(temp_file_id);
-    temp_file_id++;
-    string file_id = "temp_";
-    file_id.append(str);
-    file_id.append(".csv");
-    ofstream of;
-
-    of.open(file_id);
 
     bubbleSort(buffers, buffer_size);
+    assert(temp_file_count <= buffer_size);
+    stringstream str;
+
+    str << "temp_" << temp_file_count << ".csv";
+    temp_files[temp_file_count].open(str.str().c_str(), fstream::out);
 
     for (int i = 0; i < buffer_size; i++) {
-        of << buffers[i].eid << "," << buffers[i].ename << "," << buffers[i].age << "," << buffers[i].salary << "\n";
+        temp_files[temp_file_count] << buffers[i].eid << "," << buffers[i].ename << "," << buffers[i].age << "," << buffers[i].salary << "\n";
     }
 
-    of.close();
+    temp_files[temp_file_count].close();
+
+    temp_file_count++;
 
     return;
 }
@@ -112,36 +114,6 @@ void Sort_in_Main_Memory(){
 //You can change return type and arguments as you want.
 void Merge_Runs_in_Main_Memory(){
     cout << "Merging Not Implemented" << endl;
-    unsigned int i = 0;
-    unsigned int j = i + 1;
-    string stri = to_string(i);
-    string strj = to_string(j);
-    string file_id_i = "temp_";
-    string file_id_j = "temp_";
-
-    file_id_i.append(stri);
-    file_id_j.append(strj);
-    file_id_i.append(".csv");
-    file_id_j.append(".csv");
-
-    fstream infi;
-    fstream infj;
-
-    infi.open("temp_0.csv", ios::in);
-    infj.open("temp_1.csv", ios::in);
-
-    while (i < temp_file_id) {
-        EmpRecord empi = Grab_Emp_Record(infi);
-        EmpRecord empj = Grab_Emp_Record(infj);
-        if (empi.eid == -1) { break; }
-        cout << "EMPI eid: " << empi.eid << endl;
-        cout << "EMPJ eid: " << empj.eid << endl;
-
-    }
-
-    infi.close();
-    infj.close();
-
     return;
 }
 
@@ -177,7 +149,7 @@ int main() {
           //memory is full now. Sort the blocks in Main Memory
           //and Store it in a temporary file (runs)
           cout << "Main Memory is full. Time to sort and store sorted blocks in a temporary file" << endl;
-          //Print_Buffers(buffer_size);
+          Print_Buffers(buffer_size);
           Sort_in_Main_Memory();
 
           //After sorting start again. Clearing memory and putting the current
@@ -188,6 +160,9 @@ int main() {
       }
 
   }
+
+  Sort_in_Main_Memory();
+
   input_file.close();
 
   /* Implement 2nd Pass: Read the temporary sorted files and utilize
@@ -198,11 +173,14 @@ int main() {
   //sorted_file.open("EmpSorted.csv", ios::out | ios::app);
 
   //Pseudocode
+  /*
   bool flag_sorting_done = false;
   while(!flag_sorting_done){
       Merge_Runs_in_Main_Memory();
       break;
   }
+  */
+  Merge_Runs_in_Main_Memory();
 
   //You can delete the temporary sorted files (runs) after youre done if you want. Its okay if you dont.
 
