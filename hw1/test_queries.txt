@@ -1,0 +1,38 @@
+select avg(salary), works.did
+from emp, dept, works
+where works.did = dept.did 
+and emp.eid = works.eid 
+group by works.did;
+
+calculate the average salary for each department, 
+group by works.did
+intersect with the other three tables.
+
+
+select avg(e.salary), w.did
+from emp e 
+inner join works w on w.eid = e.eid
+inner join dept d on d.did = w.did
+where w.did = d.did 
+group by w.did;
+
+
+select distinct e.ename
+from emp e, works w, dept d
+where e.salary <= all (select avg(e1.salary)
+                   from emp e1
+                   inner join works on works.eid = e1.eid
+                   inner join dept on dept.did = works.did 
+                   group by works.did)
+and w.did = d.did;
+
+select *
+from emp
+inner join works on works.eid = emp.eid and works.did in (select did
+                                                         from dept);
+
+# returns the average salary for each department
+select avg(salary)
+from emp
+inner join works on works.eid = emp.eid
+group by works.did;

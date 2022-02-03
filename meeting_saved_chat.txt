@@ -1,0 +1,24 @@
+11:12:54 From  Alvin  to  Everyone:
+	ABC and B?
+11:13:34 From  Alexander Rash  to  Everyone:
+	ab ac and bc?
+11:14:39 From  Alexander Rash  to  Everyone:
+	abc
+11:21:28 From  Bakhtiyar Doskenov  to  Everyone:
+	Y subset X , X->Y
+11:22:18 From  Yamamoto, Satoru  to  Everyone:
+	(X,Y) -> Y and (X,Y) -> X
+11:30:17 From  Bakhtiyar Doskenov  to  Everyone:
+	BC, CD
+11:30:21 From  Gekelman, Mark  to  Everyone:
+	is there a line?
+11:30:57 From  Bakhtiyar Doskenov  to  Everyone:
+	BC, CD != B,C and C,D
+11:39:05 From  Alvin  to  Everyone:
+	so using joins will prevent false positives?
+11:46:49 From  Bakhtiyar Doskenov  to  Everyone:
+	((IS NULL(r1.B) and IS NULL(r2.B)) or (r1.B = r2.B)) and (r1.A = r2.A)
+11:48:40 From  Bakhtiyar Doskenov  to  Everyone:
+	SELECT * FROM S WHERE NOT EXISTS (SELECT * FROM R r1, R r2 WHERE	(r1.A=r2.A) and (r1.B = r2.B) )
+11:48:41 From  Alvin  to  Everyone:
+	Does using NOT IN work as well?

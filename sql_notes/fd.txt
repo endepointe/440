@@ -1,0 +1,10 @@
+
+fd => bcnf
+mv_dep => fourth normal form
+
+---
+
+Studen(ssn, sname, address, hscode, hsname, hscity, gpa, priority)
+Apply(ssn, cname, state, date, major)
+
+

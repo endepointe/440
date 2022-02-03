@@ -1,0 +1,26 @@
+(1)
+
+ab > c
+cd > e
+c > a
+c > d
+d > b
+---keys---
+ab > c
+ab > d
+ab > cd
+ab > e
+ad > ab
+c > ad
+
+ab, ad, c
+
+(2)
+
+s: {a>bc, cd>e, b>d, e>a, cf>b}
+cd>bc
+d > c
+
+(3)
+ab>c 
+c>a
