@@ -82,18 +82,19 @@ void bubbleSort(EmpRecord* emp, int size) {
     }
 }
 
-//Sorting the buffers in main_memory based on 'eid' and storing the sorted records into a temporary file
+//Sorting the buffers in main_memory based on 'eid' and storing the sorted
+//records into a temporary file
 //You can change return type and arguments as you want.
 void Sort_in_Main_Memory(){
     //cout << "Sorting Not Implemented\n" << endl;
     string str = to_string(temp_file_id);
     temp_file_id++;
-    string id = "temp_";
-    id.append(str);
-    id.append(".csv");
+    string file_id = "temp_";
+    file_id.append(str);
+    file_id.append(".csv");
     ofstream of;
 
-    of.open(id);
+    of.open(file_id);
 
     bubbleSort(buffers, buffer_size);
 
@@ -101,13 +102,47 @@ void Sort_in_Main_Memory(){
         of << buffers[i].eid << "," << buffers[i].ename << "," << buffers[i].age << "," << buffers[i].salary << "\n";
     }
 
+    of.close();
+
     return;
 }
 
-//You can use this function to merge your M-1 runs using the buffers in main memory and storing them in sorted file 'EmpSorted.csv'(Final Output File)
+//You can use this function to merge your M-1 runs using the buffers in main
+//memory and storing them in sorted file 'EmpSorted.csv'(Final Output File)
 //You can change return type and arguments as you want.
 void Merge_Runs_in_Main_Memory(){
     cout << "Merging Not Implemented" << endl;
+    unsigned int i = 0;
+    unsigned int j = i + 1;
+    string stri = to_string(i);
+    string strj = to_string(j);
+    string file_id_i = "temp_";
+    string file_id_j = "temp_";
+
+    file_id_i.append(stri);
+    file_id_j.append(strj);
+    file_id_i.append(".csv");
+    file_id_j.append(".csv");
+
+    fstream infi;
+    fstream infj;
+
+    infi.open("temp_0.csv", ios::in);
+    infj.open("temp_1.csv", ios::in);
+
+    while (i < temp_file_id) {
+        EmpRecord empi = Grab_Emp_Record(infi);
+        EmpRecord empj = Grab_Emp_Record(infj);
+        if (empi.eid == -1) { break; }
+        cout << "EMPI eid: " << empi.eid << endl;
+        cout << "EMPJ eid: " << empj.eid << endl;
+
+    }
+
+    infi.close();
+    infj.close();
+
+    return;
 }
 
 int main() {
@@ -129,7 +164,9 @@ int main() {
       // checks if filestream is empty
       if (single_EmpRecord.eid == -1) {
           flag = false;
-          Print_Buffers(cur_size); // The main_memory is not filled up but there are some leftover data that needs to be sorted.
+          Print_Buffers(cur_size); // The main_memory is not filled up but
+                                   // there are some leftover data that needs
+                                   // to be sorted.
       }
       if(cur_size + 1 <= buffer_size){
           //Memory is not full store current record into buffers.
@@ -137,14 +174,14 @@ int main() {
           cur_size += 1;
       }
       else{
-          //memory is full now. Sort the blocks in Main Memory and Store it in a temporary file (runs)
+          //memory is full now. Sort the blocks in Main Memory
+          //and Store it in a temporary file (runs)
           cout << "Main Memory is full. Time to sort and store sorted blocks in a temporary file" << endl;
-          Print_Buffers(buffer_size);
+          //Print_Buffers(buffer_size);
           Sort_in_Main_Memory();
 
-          //Print_Buffers(buffer_size);
-
-          //After sorting start again. Clearing memory and putting the current one into main memory.
+          //After sorting start again. Clearing memory and putting the current
+          //one into main memory.
           cur_size = 0;
           buffers[cur_size] = single_EmpRecord;
           cur_size += 1;
@@ -153,7 +190,8 @@ int main() {
   }
   input_file.close();
 
-  /* Implement 2nd Pass: Read the temporary sorted files and utilize main_memory to store sorted runs into the EmpSorted.csv*/
+  /* Implement 2nd Pass: Read the temporary sorted files and utilize
+   * main_memory to store sorted runs into the EmpSorted.csv*/
 
   //Uncomment when you are ready to store the sorted relation
   //fstream sorted_file;
