@@ -6,6 +6,7 @@
 //And continue this process untill the full Emp.csv is read.
 
 #include <cassert>
+#include <unistd.h>
 #include <bits/stdc++.h>
 using namespace std;
 
@@ -24,7 +25,6 @@ EmpRecord buffers[buffer_size]; // this structure contains 22 buffers;
 unsigned int temp_file_count = 0; // keeps track of the number of temp
                                // files generated.
 fstream temp_files[buffer_size]; //
-
 
 // Grab a single block from the Emp.csv file, in theory if a block was larger than
 // one tuple, this function would return an array of EmpRecords and the entire if
@@ -61,12 +61,17 @@ void Print_Buffers(int cur_size) {
     }
 }
 
+void Write_Emp(fstream &of, EmpRecord &emp) {
+    of << emp.eid << "," << emp.ename << "," << emp.age << "," << emp.salary << endl;
+}
+
 // utility function to swap buffer objects
 void swap (EmpRecord* r1, EmpRecord* r2) {
     EmpRecord r = *r1;
     *r1 = *r2;
     *r2 = r;
 }
+
 void bubbleSort(EmpRecord* emp, int size) {
 
     int i, j;
@@ -88,7 +93,7 @@ void bubbleSort(EmpRecord* emp, int size) {
 //Sorting the buffers in main_memory based on 'eid' and storing the sorted
 //records into a temporary file
 //You can change return type and arguments as you want.
-void Sort_in_Main_Memory(){
+void Sort_in_Main_Memory() {
     //cout << "Sorting Not Implemented\n" << endl;
 
     bubbleSort(buffers, buffer_size);
@@ -99,7 +104,7 @@ void Sort_in_Main_Memory(){
     temp_files[temp_file_count].open(str.str().c_str(), fstream::out);
 
     for (int i = 0; i < buffer_size; i++) {
-        temp_files[temp_file_count] << buffers[i].eid << "," << buffers[i].ename << "," << buffers[i].age << "," << buffers[i].salary << "\n";
+        Write_Emp(temp_files[temp_file_count], buffers[i]);
     }
 
     temp_files[temp_file_count].close();
@@ -112,9 +117,36 @@ void Sort_in_Main_Memory(){
 //You can use this function to merge your M-1 runs using the buffers in main
 //memory and storing them in sorted file 'EmpSorted.csv'(Final Output File)
 //You can change return type and arguments as you want.
-void Merge_Runs_in_Main_Memory(){
-    cout << "Merging Not Implemented" << endl;
-    return;
+void Merge_Runs_in_Main_Memory(fstream &emp_sorted_file){
+    //cout << "Merging Not Implemented" << endl;
+
+    for (int i = 0; i < temp_file_count; ++i) {
+        stringstream str;
+        str << "temp_" << i << ".csv";
+        temp_files[i].open(str.str().c_str(), ios::in);
+        buffers[i] = Grab_Emp_Record(temp_files[i]);
+
+        while (true) {
+
+            int m = INT_MAX, idx = -1;
+
+            for (int i = 0; i < temp_file_count; ++i) {
+
+                if (buffers[i].eid < 0) continue;
+                if (buffers[i].eid < m) {
+                    m = buffers[i].eid;
+                    idx = i;
+                }
+            }
+
+            // if the emp dne
+            if (idx < 0) break;
+
+            // write to final file
+            Write_Emp(emp_sorted_file, buffers[idx]);
+            buffers[idx] = Grab_Emp_Record(temp_files[idx]);
+        }
+    }
 }
 
 int main() {
@@ -140,7 +172,7 @@ int main() {
                                    // there are some leftover data that needs
                                    // to be sorted.
       }
-      if(cur_size + 1 <= buffer_size){
+      else if(cur_size + 1 <= buffer_size){
           //Memory is not full store current record into buffers.
           buffers[cur_size] = single_EmpRecord;
           cur_size += 1;
@@ -161,7 +193,10 @@ int main() {
 
   }
 
-  Sort_in_Main_Memory();
+  if (cur_size > 0) {
+      Print_Buffers(cur_size);
+      Sort_in_Main_Memory();
+  }
 
   input_file.close();
 
@@ -180,9 +215,18 @@ int main() {
       break;
   }
   */
-  Merge_Runs_in_Main_Memory();
+  fstream emp_sorted_file;
+  emp_sorted_file.open("EmpSorted.csv", ios::out | ios::app);
+  Merge_Runs_in_Main_Memory(emp_sorted_file);
+  //emp_sorted.close();
 
   //You can delete the temporary sorted files (runs) after youre done if you want. Its okay if you dont.
+
+  for (int i = 0; i < temp_file_count; ++i) {
+    stringstream str;
+    str << "temp_" << i << ".csv";
+    unlink(str.str().c_str());
+  }
 
   return 0;
 }
