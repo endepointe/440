@@ -43,6 +43,7 @@ class LinearHashIndex {
                // 2^(i-1) < numBlocks <= 2^(i)
         int numRecords; // Records in index
         int nextFreePage; // Next page to write to
+        float percentageFilled;
         string fName;
 
         // Insert new record into index
@@ -89,6 +90,7 @@ class LinearHashIndex {
             i = 0;
             numRecords = 0;
             numBlocks = 0;
+            percentageFilled = 0.0;
             fName = indexFileName;
         }
 
@@ -131,6 +133,9 @@ class LinearHashIndex {
 
         // Given an ID, find the relevant record and print it
         Record findRecordById(int id) {
+            // read max of 2 blocks, ideally 1 unless bit flip
 
+            // put the hashed values into a vector that
+            // matches the directory index key.
         }
 };
