@@ -65,9 +65,11 @@ class LinearHashIndex {
 
             i = (int)log2(numBlocks);
             string bitValue = bitset<64>(hashValue).to_string();
+
             cout << "hashValue: " << hashValue << endl;
             cout << "bitValue: " << bitValue << endl;
             cout << "log2(" << numBlocks << "): " << i << endl;
+
             pageDirectory.push_back(i);
             numRecords = pageDirectory.size();
 
