@@ -7,75 +7,130 @@
 using namespace std;
 
 class Record {
-public:
-    int id, manager_id;
-    std::string bio, name;
+    public:
+        int id, manager_id; // fixed size of 8 bytes
+        string bio, name; // [0, 500], [0, 200] bytes
 
-    Record(vector<std::string> fields) {
-        id = stoi(fields[0]);
-        name = fields[1];
-        bio = fields[2];
-        manager_id = stoi(fields[3]);
-    }
+        Record(vector<string> fields) {
+            id = stoi(fields[0]);
+            name = fields[1];
+            bio = fields[2];
+            manager_id = stoi(fields[3]);
+        }
 
-    void print() {
-        cout << "\tID: " << id << "\n";
-        cout << "\tNAME: " << name << "\n";
-        cout << "\tBIO: " << bio << "\n";
-        cout << "\tMANAGER_ID: " << manager_id << "\n";
-    }
+        void print() {
+            cout << "\tID: " << id << "\n";
+            cout << "\tNAME: " << name << "\n";
+            cout << "\tBIO: " << bio << "\n";
+            cout << "\tMANAGER_ID: " << manager_id << "\n";
+        }
 };
 
 
 class LinearHashIndex {
 
-private:
-    const int PAGE_SIZE = 4096;
+    private:
+        const int PAGE_SIZE = 4096;
 
-    vector<int> pageDirectory;  // Where pageDirectory[h(id)] gives 
-                                // page index of block.
-                                //
-                                // can scan to pages using index*PAGE_SIZE 
-                                // as offset (using seek function)
-    int numBlocks; // n
-    int i;
-    int numRecords; // Records in index
-    int nextFreePage; // Next page to write to
+        vector<int> pageDirectory;  // Where pageDirectory[h(id)] gives
+                                    // page index of block.
+                                    //
+                                    // can scan to pages using
+                                    // index*PAGE_SIZE
+                                    // as offset (using seek function)
+        int numBlocks; // n
+        int i; // the number of bits reqd to store numBlocks
+               // 2^(i-1) < numBlocks <= 2^(i)
+        int numRecords; // Records in index
+        int nextFreePage; // Next page to write to
+        string fName;
 
-    // Insert new record into index
-    void insertRecord(Record record) {
+        // Insert new record into index
+        void insertRecord(Record record) {
 
-        // No records written to index yet
-        if (numRecords == 0) {
-            // Initialize index with first blocks (start with 2)
+            // No records written to index yet
+            if (numRecords == 0) {
+                // Initialize index with first blocks (start with 2)
+                numBlocks = 2;
+            }
+
+            // Add record to the index in the correct block,
+            // creating overflow block if necessary
+            int hashValue = record.id % (int)(pow(2.0, 16.0));
+
+            // I need to use i to determine the number of bits
+            // to use as the directory index entries. I was going
+            // about this wrong for an hour :(
+
+            i = (int)log2(numBlocks);
+            string bitValue = bitset<64>(hashValue).to_string();
+            cout << "hashValue: " << hashValue << endl;
+            cout << "bitValue: " << bitValue << endl;
+            cout << "log2(" << numBlocks << "): " << i << endl;
+            pageDirectory.push_back(i);
+            numRecords = pageDirectory.size();
+
+            // Take neccessary steps if capacity is reached
 
         }
 
-        // Add record to the index in the correct block, 
-        // creating overflow block if necessary
+        void getPageDirectory() {
+            for (vector<int>::iterator it = pageDirectory.begin();
+                                            it != pageDirectory.end();
+                                            ++it) {
+                cout << " " << *it;
+            }
 
+        }
 
-        // Take neccessary steps if capacity is reached
+    public:
+        LinearHashIndex(string indexFileName) {
+            numBlocks = 0;
+            i = 0;
+            numRecords = 0;
+            numBlocks = 0;
+            fName = indexFileName;
+        }
 
+        // Read csv file and add records to the index
+        void createFromFile(string csvFName) {
+            ifstream inF;
+            inF.open(csvFName);
 
-    }
+            if (!inF) {
+                cerr << "Cannot open file: " << csvFName << endl;
+            }
 
-public:
-    LinearHashIndex(string indexFileName) {
-        numBlocks = 0;
-        i = 0;
-        numRecords = 0;
-        block_size = 0;
-        fName = indexFileName;
-    }
+            vector<string> recordFields;
+            string line, field;
 
-    // Read csv file and add records to the index
-    void createFromFile(string csvFName) {
-        
-    }
+            while (getline(inF, line, '\n')) {
 
-    // Given an ID, find the relevant record and print it
-    Record findRecordById(int id) {
-        
-    }
+                stringstream ss(line);
+                // id
+                getline(ss, field, ',');
+                recordFields.push_back(field);
+                // name
+                getline(ss, field, ',');
+                recordFields.push_back(field);
+                // bio
+                getline(ss, field, ',');
+                recordFields.push_back(field);
+                // manager_id
+                getline(ss, field, ',');
+                recordFields.push_back(field);
+
+                Record newRecord(recordFields);
+                insertRecord(newRecord);
+
+                recordFields.clear();
+            }
+
+            inF.close();
+        }
+
+        // Given an ID, find the relevant record and print it
+        Record findRecordById(int id) {
+
+        }
 };
