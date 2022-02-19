@@ -85,7 +85,7 @@ class LinearHashIndex {
                 //open file check if there is space
                 //the loop is here to open the 16bit filename, filling
                 //the additional space with zeros to match correct file.
-                string fn;
+                string file;
                 for (int i = 0; i < 16-iBits.length(); i++) {
                     fn += "0";
                 }
@@ -94,15 +94,30 @@ class LinearHashIndex {
                 cout << "open file: " << fn << endl;
                 //if there is space, insert record into block
                 vector<string> data;
-                readBlockData(fn, data);
+                readBlockData(file, data);
                 cout << "first line of " << fn << " is " << data.at(0) << endl;
                 cout << "second line of " << fn << " is " << data.at(1) << endl;
                 cout << "third line of " << fn << " is " << data.at(2) << endl;
                 cout << data.at(0) << " / " << PAGE_SIZE << " = ";
-                cout << (float)(stoi(data.at(0))) / (float)(PAGE_SIZE) << endl;
-                //if (((float)(stoi(data.at(0))) / (float)(PAGE_SIZE)) < .7) {
+                cout << (float)(stoi(data.at(0)) + record.size) / (float)(PAGE_SIZE) << endl;
+                // if the current block size + new record size are < .7
+                // of capacity, add the record to the block.
+                if (((float)(stoi(data.at(0))+record.size) > (float)(PAGE_SIZE)) < .7) {
                     //addRecord(hbs, record, false);
-                //}
+                    //update block
+                } else {
+                    // create an overflow block.
+                    // For now, just add the records until
+                    // I have a better solution
+
+                    // Current solution would be to keep the block size
+                    // < than PAGE_SIZE and just increment the number
+                    // of records in the block.
+                    // Then, to check if there was overflow, check if the
+                    // sum of the record.size of all records in
+                    // block >= PAGE_SIZE,
+
+                }
             } else {
                 // flip the msb of the last i bits
                 if (bstoi(iBits) >= numBlocks) {
@@ -204,20 +219,9 @@ class LinearHashIndex {
 
             bf.open(str.str().c_str(), fstream::out);
 
-            // read block size
-            int size = 10;//readBlockSize(bf);
+            bf<<r.id<<","<<r.name<<","<<r.bio<<","<<r.manager_id<<endl;
 
-            // read record count
-            int count = 11;//readRecordCount(bf);
-
-            // if all is well, write the record to the block
-            if (size + r.size > PAGE_SIZE) {
-                bf<<r.id<<","<<r.name<<","<<r.bio<<","<<r.manager_id<<endl;
-                numRecords++;
-            }
             bf.close();
-
-
         }
 
         // update the record header (the top 3 lines) with the
@@ -225,20 +229,21 @@ class LinearHashIndex {
         // 1 size
         // 2 count
         // 3 csv of records
-        void updateBlockData(string filename) {
+        void updateBlockData(string filename, Record &record) {
             ifstream ifs;
             ofstream ofs;
             ifs.open(filename);
-            ofs.open("_fn_");
+            ofs.open("_del_");
             string line;
-            int size, count, recordSize = 1;
+            int size, count;
 
             getline(ifs,line);
             size = stoi(line);
             getline(ifs,line);
             count = stoi(line);
+
             // update line 1 of block file
-            size += recordSize;
+            size += record.size;
             count++;
 
             ofs << size << endl;
@@ -251,10 +256,71 @@ class LinearHashIndex {
             if (remove(filename.c_str()) != 0) {
                 perror("Error deleting file.");
             } else {
-                rename("_fn_", filename.c_str());
+                rename("_del_", filename.c_str());
             }
         }
 
+        void updateBlockSize(string filename, Record &record) {
+            ifstream ifs;
+            ofstream ofs;
+            ifs.open(filename);
+            ofs.open("_del_");
+            string line;
+            int size, count;
+
+            getline(ifs,line);
+            size = stoi(line);
+            getline(ifs,line);
+            count = stoi(line);
+
+            // update line 1 of block file
+            size += record.size;
+            count++;
+
+            ofs << size << endl;
+            ofs << count << endl;
+            ofs << ifs.rdbuf();
+
+            ofs.close();
+            ifs.close();
+
+            if (remove(filename.c_str()) != 0) {
+                perror("Error deleting file.");
+            } else {
+                rename("_del_", filename.c_str());
+            }
+        }
+
+        void updateBlockRecordCount(string filename, Record &record) {
+            ifstream ifs;
+            ofstream ofs;
+            ifs.open(filename);
+            ofs.open("_del_");
+            string line;
+            int size, count;
+
+            getline(ifs,line);
+            size = stoi(line);
+            getline(ifs,line);
+            count = stoi(line);
+
+            // update line 1 of block file
+            size += record.size;
+            count++;
+
+            ofs << size << endl;
+            ofs << count << endl;
+            ofs << ifs.rdbuf();
+
+            ofs.close();
+            ifs.close();
+
+            if (remove(filename.c_str()) != 0) {
+                perror("Error deleting file.");
+            } else {
+                rename("_del_", filename.c_str());
+            }
+        }
         // reads the block data of given filename:
         // line 1: size of block (must be < 4096 and < .7
         // line 2: number of records in block
