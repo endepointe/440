@@ -87,17 +87,17 @@ class LinearHashIndex {
                 //the additional space with zeros to match correct file.
                 string file;
                 for (int i = 0; i < 16-iBits.length(); i++) {
-                    fn += "0";
+                    file += "0";
                 }
-                fn += iBits;
-                fn += ".temp";
-                cout << "open file: " << fn << endl;
+                file += iBits;
+                file += ".temp";
+                cout << "open file: " << file << endl;
                 //if there is space, insert record into block
                 vector<string> data;
                 readBlockData(file, data);
-                cout << "first line of " << fn << " is " << data.at(0) << endl;
-                cout << "second line of " << fn << " is " << data.at(1) << endl;
-                cout << "third line of " << fn << " is " << data.at(2) << endl;
+                cout << "first line of " << file << " is " << data.at(0) << endl;
+                cout << "second line of " << file << " is " << data.at(1) << endl;
+                cout << "third line of " << file << " is " << data.at(2) << endl;
                 cout << data.at(0) << " / " << PAGE_SIZE << " = ";
                 cout << (float)(stoi(data.at(0)) + record.size) / (float)(PAGE_SIZE) << endl;
                 // if the current block size + new record size are < .7
