@@ -100,9 +100,9 @@ class LinearHashIndex {
                 cout << "third line of " << file << " is " << data.at(2) << endl;
                 cout << data.at(0) << " / " << PAGE_SIZE << " = ";
                 cout << (float)(stoi(data.at(0)) + record.size) / (float)(PAGE_SIZE) << endl;
-                // if the current block size + new record size are < .7
-                // of capacity, add the record to the block.
-                if (((float)(stoi(data.at(0))+record.size) >= (float)(PAGE_SIZE))) {
+                // if the current block size + new record size are <
+                // PAGE_SIZE, add the record to the block.
+                if (((float)(stoi(data.at(0))+record.size) < (float)(PAGE_SIZE))) {
                     //addRecord(hbs, record, false);
                     //update block
                 } else {
