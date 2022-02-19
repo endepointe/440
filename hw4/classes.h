@@ -212,15 +212,17 @@ class LinearHashIndex {
             ifs.open(filename);
             ofs.open("_fn_");
             string line;
-            int size, count;
+            int size, count, recordSize = 1;
 
             getline(ifs,line);
             size = stoi(line);
             getline(ifs,line);
             count = stoi(line);
-            x += stoi(size);
+            // update line 1 of block file
+            size += recordSize;
+            count++;
 
-            ofs << x << endl;
+            ofs << size << endl;
             ofs << count << endl;
             ofs << ifs.rdbuf();
 
