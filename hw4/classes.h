@@ -60,16 +60,16 @@ class LinearHashIndex {
                 // create files that represent blocks
                 for (int i = 0; i < numBlocks; i++) {
                     pageDirectory.push_back(i);
-                    createFile(pageDirectory.at(i));
+                    createBlockFile(pageDirectory.at(i));
                 }
             }
 
             i = (int)(ceil(log2(numBlocks)));
 
-            percentageFilled = (float)numRecords / (float)numBlocks;
+            //percentageFilled = (float)numRecords / (float)numBlocks;
 
-            string binstr = htobs(createHash(record.id));
-            string iBits = binstr.substr((binstr.length()) - i, i);
+            string hbs = htobs(createHash(record.id));
+            string iBits = hbs.substr((hbs.length()) - i, i);
 
             // if average number of records >= 70%, increment numBlocks
             /*
@@ -79,22 +79,40 @@ class LinearHashIndex {
             }
             */
 
-            // check the last i bits of hashValue
-            // if the last i bits are greater than the numBlocks,
-            // flip the msb of the last i bits
-            if (bstoi(iBits) >= numBlocks) {
-                cout << "flip this bit: " << iBits.front() << endl;
-                string bitFlip = iBits;
-                if (iBits.front() == '1') {
-                    bitFlip.front() = '0';
+            // scan pageDirectory for pageDirectory[i] == iBits
+            if (findBlock(iBits)) {
+                //check if there is space in matching block file
+                fstream fs;
+                stringstream ss;
+                string size;
+                ss << hbs << ".temp";
+                fs.open(ss.str().c_str(), fstream::in);
+                cout << "reading file: " << ss.str().c_str() << endl;
+                getline(fs, size);
+                cout << "size of block: " << size << endl;
+                fs.close();
+                //if there is space, insert record into block
+                //addRecord(hbs, record, false);
+            } else {
+                // flip the msb of the last i bits
+                if (bstoi(iBits) >= numBlocks) {
+                    cout << "flip this bit: " << iBits.front() << endl;
+                    string bitFlip = iBits;
+                    if (iBits.front() == '1') {
+                        bitFlip.front() = '0';
+                    } else {
+                        bitFlip.front() = '1';
+                    }
+                    cout << "search again for flipped bit" << endl;
+                    if (findBlock(bitFlip)) {
+                        cout << "insert record into matched block." << endl;
+                        //addRecord(hbs, record, true);
+                    } else {
+                        cout << "add a new block." << endl;
+                        numBlocks++;
+                    }
                 }
-                cout << "bitFlip: " << bitFlip << endl;
             }
-
-            // Add record to the temp file that matches the
-            // index block.
-            // creating overflow block if necessary
-
         }
 
         int createHash(int id) {
@@ -111,25 +129,110 @@ class LinearHashIndex {
             return stoi(binary, nullptr, 2);
         }
 
-        bool checkPageDirectory() {
-            cout << "check page directory for given value." << endl;
-            return false;
+        // scans pageDirectory for matching i bits
+        bool findBlock(string bits) {
+            bool found = false;
+            string temp, block;
+            cout << "check page directory for last: ";
+            cout << i << "bits of "<< bits << endl;
+            for (vector<int>::iterator it = pageDirectory.begin();
+                it != pageDirectory.end(); ++it) {
+                temp = htobs(*it);
+                block = temp.substr(temp.length()-i, temp.length());
+                cout << "pd("<<*it<<"): "<< block << endl;
+                // block found
+                if (block.compare(bits) == 0) {
+                    cout << block << " == " << bits << endl;
+                    found = true;
+                    break;
+                }
+            }
+            return found;
         }
 
-        void createFile(int idx) {
+        // creates block file, using the idx to create a 16 bit
+        // filename. eg: idx=1, then fn=0000000000000001.temp
+        void createBlockFile(int idx) {
             string binstr = htobs(idx);
             cout << "create temp file " << binstr << ".temp." << endl;
             stringstream str;
             fstream file;
-            str << idx << ".temp";
+
+            str << binstr << ".temp";
             file.open(str.str().c_str(), fstream::out);
+
+            // write starting block size of 0 to line 1
+            // the number of records in block on line 2
+            // and the csv of hashvalues as binary strings on line 3
+            file << 0 << endl;
+            file << 0 << endl;
+            file << " " << endl;
+
             file.close();
         }
 
-        void addRecord(fstream &file, Record &r) {
-            cout << "add record to file." << endl;
-            file<<r.id<<","<<r.name<<","<<r.bio<<","<<r.manager_id<<endl;
-            numRecords++;
+        // the pageDirectory block has already been found.
+        // just open the file
+        void addRecord(string bs, Record &r, bool flipped) {
+            // open the file
+            fstream bf;
+            stringstream str;
+            if (!flipped) {
+                str << bs << ".temp";
+            } else {
+                // open the file matching the flipped bit in the bs
+                string bitFlip = bs;
+                if (bs.front() == '1') {
+                    bitFlip.front() = '0';
+                } else {
+                    bitFlip.front() = '1';
+                }
+                str << bitFlip << ".temp";
+                cout << "addRecord: bitFlip/bs = "<<bitFlip<<"/"<<bs<<endl;
+            }
+
+            bf.open(str.str().c_str(), fstream::out);
+
+            // read block size
+            int size = readBlockSize(bf);
+
+            // read record count
+            int count = readRecordCount(bf);
+
+            // if all is well, write the record to the block
+            if (size + r.size > PAGE_SIZE) {
+                bf<<r.id<<","<<r.name<<","<<r.bio<<","<<r.manager_id<<endl;
+                numRecords++;
+            }
+            bf.close();
+
+            // update the record header (the top 3 lines) with the
+            // new data:
+            // 1 size
+            // 2 count
+            // 3 csv of records
+        }
+
+        int readBlockSize(fstream &file) {
+            string size;
+            getline(file, size);
+            return stoi(size);
+        }
+
+        // reads the second line of a block file,
+        // returning the number of records in the block.
+        int readRecordCount(fstream &file) {
+            string count;
+            getline(file, count);
+            return stoi(count);
+        }
+
+        void writeBlockSize(fstream &file, Record &r, int size) {
+            file << r.size + size << endl;
+        }
+
+        void writeRecordSize(fstream &file, Record &r, int size) {
+
         }
 
     public:
