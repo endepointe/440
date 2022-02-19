@@ -51,6 +51,7 @@ class LinearHashIndex {
         // Insert new record into index
         void insertRecord(Record record) {
 
+
             // No records written to index yet
             if (numRecords == 0) {
                 // Initialize index with first blocks (start with 2)
@@ -66,8 +67,6 @@ class LinearHashIndex {
 
             i = (int)(ceil(log2(numBlocks)));
 
-            //percentageFilled = (float)numRecords / (float)numBlocks;
-
             string hbs = htobs(createHash(record.id));
             string iBits = hbs.substr((hbs.length()) - i, i);
 
@@ -82,15 +81,6 @@ class LinearHashIndex {
             // scan pageDirectory for pageDirectory[i] == iBits
             if (findBlock(iBits)) {
                 //check if there is space in matching block file
-                fstream fs;
-                stringstream ss;
-                string size;
-                ss << hbs << ".temp";
-                fs.open(ss.str().c_str(), fstream::in);
-                cout << "reading file: " << ss.str().c_str() << endl;
-                getline(fs, size);
-                cout << "size of block: " << size << endl;
-                fs.close();
                 //if there is space, insert record into block
                 //addRecord(hbs, record, false);
             } else {
@@ -113,6 +103,8 @@ class LinearHashIndex {
                     }
                 }
             }
+            vector<string> d = readBlockData("test.txt");
+            updateBlockData("test.txt");
         }
 
         int createHash(int id) {
@@ -164,8 +156,8 @@ class LinearHashIndex {
             // write starting block size of 0 to line 1
             // the number of records in block on line 2
             // and the csv of hashvalues as binary strings on line 3
-            file << 0 << endl;
-            file << 0 << endl;
+            file << 10 << endl;
+            file << 33 << endl;
             file << " " << endl;
 
             file.close();
@@ -194,10 +186,10 @@ class LinearHashIndex {
             bf.open(str.str().c_str(), fstream::out);
 
             // read block size
-            int size = readBlockSize(bf);
+            int size = 10;//readBlockSize(bf);
 
             // read record count
-            int count = readRecordCount(bf);
+            int count = 11;//readRecordCount(bf);
 
             // if all is well, write the record to the block
             if (size + r.size > PAGE_SIZE) {
@@ -211,20 +203,60 @@ class LinearHashIndex {
             // 1 size
             // 2 count
             // 3 csv of records
+
         }
 
-        int readBlockSize(fstream &file) {
-            string size;
-            getline(file, size);
-            return stoi(size);
+        void updateBlockData(string filename) {
+            ifstream ifs;
+            ofstream ofs;
+            ifs.open(filename);
+            ofs.open("_fn_");
+            string line;
+            int size, count;
+
+            getline(ifs,line);
+            size = stoi(line);
+            getline(ifs,line);
+            count = stoi(line);
+            x += stoi(size);
+
+            ofs << x << endl;
+            ofs << count << endl;
+            ofs << ifs.rdbuf();
+
+            ofs.close();
+            ifs.close();
+
+            if (remove(filename.c_str()) != 0) {
+                perror("Error deleting file.");
+            } else {
+                rename("_fn_", filename.c_str());
+            }
         }
 
-        // reads the second line of a block file,
-        // returning the number of records in the block.
-        int readRecordCount(fstream &file) {
-            string count;
-            getline(file, count);
-            return stoi(count);
+        // reads the block data of given filename:
+        // line 1: size of block (must be < 4096 and < .7
+        // line 2: number of records in block
+        // line 3: csv of records
+        vector<string> readBlockData(string filename) {
+            ifstream ifs;
+            ifs.open(filename, ios::in);
+            string text;
+            vector<string> data;
+            int num = 0;
+
+            if (ifs.is_open()) {
+                while (num < 3) {
+                    getline(ifs, text);
+                    data.push_back(text);
+                    num++;
+                }
+            } else {
+                cout << "Error opening file." << endl;
+            }
+
+            ifs.close();
+            return data;
         }
 
         void writeBlockSize(fstream &file, Record &r, int size) {
