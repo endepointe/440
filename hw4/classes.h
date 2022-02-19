@@ -51,7 +51,6 @@ class LinearHashIndex {
         // Insert new record into index
         void insertRecord(Record record) {
 
-
             // No records written to index yet
             if (numRecords == 0) {
                 // Initialize index with first blocks (start with 2)
@@ -70,6 +69,9 @@ class LinearHashIndex {
             string hbs = htobs(createHash(record.id));
             string iBits = hbs.substr((hbs.length()) - i, i);
 
+            cout << "hbs of " << record.id << " is " << hbs << endl;
+            cout << "last " << i << " bits: " << iBits << endl;
+
             // if average number of records >= 70%, increment numBlocks
             /*
             if (percentageFilled >= .7) {
@@ -80,9 +82,27 @@ class LinearHashIndex {
 
             // scan pageDirectory for pageDirectory[i] == iBits
             if (findBlock(iBits)) {
-                //check if there is space in matching block file
+                //open file check if there is space
+                //the loop is here to open the 16bit filename, filling
+                //the additional space with zeros to match correct file.
+                string fn;
+                for (int i = 0; i < 16-iBits.length(); i++) {
+                    fn += "0";
+                }
+                fn += iBits;
+                fn += ".temp";
+                cout << "open file: " << fn << endl;
                 //if there is space, insert record into block
-                //addRecord(hbs, record, false);
+                vector<string> data;
+                readBlockData(fn, data);
+                cout << "first line of " << fn << " is " << data.at(0) << endl;
+                cout << "second line of " << fn << " is " << data.at(1) << endl;
+                cout << "third line of " << fn << " is " << data.at(2) << endl;
+                cout << data.at(0) << " / " << PAGE_SIZE << " = ";
+                cout << (float)(stoi(data.at(0))) / (float)(PAGE_SIZE) << endl;
+                //if (((float)(stoi(data.at(0))) / (float)(PAGE_SIZE)) < .7) {
+                    //addRecord(hbs, record, false);
+                //}
             } else {
                 // flip the msb of the last i bits
                 if (bstoi(iBits) >= numBlocks) {
@@ -103,8 +123,6 @@ class LinearHashIndex {
                     }
                 }
             }
-            vector<string> d = readBlockData("test.txt");
-            updateBlockData("test.txt");
         }
 
         int createHash(int id) {
@@ -112,6 +130,7 @@ class LinearHashIndex {
         }
 
         // converts a hash value to binary string
+        // only need 16 bits
         string htobs(int hash) {
             return bitset<16>(hash).to_string();
         }
@@ -156,9 +175,9 @@ class LinearHashIndex {
             // write starting block size of 0 to line 1
             // the number of records in block on line 2
             // and the csv of hashvalues as binary strings on line 3
-            file << 10 << endl;
-            file << 33 << endl;
-            file << " " << endl;
+            file << 0 << endl;
+            file << 0 << endl;
+            file << "" << endl;
 
             file.close();
         }
@@ -198,14 +217,14 @@ class LinearHashIndex {
             }
             bf.close();
 
-            // update the record header (the top 3 lines) with the
-            // new data:
-            // 1 size
-            // 2 count
-            // 3 csv of records
 
         }
 
+        // update the record header (the top 3 lines) with the
+        // new data:
+        // 1 size
+        // 2 count
+        // 3 csv of records
         void updateBlockData(string filename) {
             ifstream ifs;
             ofstream ofs;
@@ -240,11 +259,11 @@ class LinearHashIndex {
         // line 1: size of block (must be < 4096 and < .7
         // line 2: number of records in block
         // line 3: csv of records
-        vector<string> readBlockData(string filename) {
+        void readBlockData(string filename, vector<string> &data) {
+            cout << "read file: " << filename << endl;
             ifstream ifs;
             ifs.open(filename, ios::in);
             string text;
-            vector<string> data;
             int num = 0;
 
             if (ifs.is_open()) {
@@ -258,7 +277,6 @@ class LinearHashIndex {
             }
 
             ifs.close();
-            return data;
         }
 
         void writeBlockSize(fstream &file, Record &r, int size) {
