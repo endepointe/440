@@ -70,9 +70,6 @@ class LinearHashIndex {
             string iBits = hbs.substr((hbs.length()) - i, i);
             string block;
 
-            cout << "hbs of " << record.id << " is " << hbs << endl;
-            cout << "last " << i << " bits: " << iBits << endl;
-
             // if average number of records >= 70%, increment numBlocks
             /*
             if (percentageFilled >= .7) {
@@ -89,17 +86,12 @@ class LinearHashIndex {
                 for (int i = 0; i < 16-iBits.length(); i++) {
                     block += "0";
                 }
+
                 block += iBits;
                 block += ".block";
-                cout << "open block: " << block << endl;
                 //if there is space, insert record into block
                 vector<string> data;
                 readBlockData(block, data);
-                cout << "first line of " << block << " is " << data.at(0) << endl;
-                cout << "second line of " << block << " is " << data.at(1) << endl;
-                cout << "third line of " << block << " is " << data.at(2) << endl;
-                cout << data.at(0) << " / " << PAGE_SIZE << " = ";
-                cout << (float)(stoi(data.at(0)) + record.size) / (float)(PAGE_SIZE) << endl;
                 // if the current block size + new record size are <
                 // PAGE_SIZE, add the record to the block.
                 if (((float)(stoi(data.at(0))+record.size) <
@@ -108,7 +100,6 @@ class LinearHashIndex {
                     updateBlockSize(block,record);
                     updateBlockRecordCount(block);
                     updateBlockHashList(block,hbs);
-                    cout << "add record to block: " << block << endl;
                 } else {
                     // create an overflow block.
                     // For now, just add the records until
@@ -125,23 +116,19 @@ class LinearHashIndex {
             } else {
                 // flip the msb of the last i bits
                 if (bstoi(iBits) >= numBlocks) {
-                    cout << "flip this bit: " << iBits.front() << endl;
                     string bitFlip = iBits;
                     if (iBits.front() == '1') {
                         bitFlip.front() = '0';
                     } else {
                         bitFlip.front() = '1';
                     }
-                    cout << "search again for flipped bit" << endl;
                     if (findBlock(bitFlip)) {
-                        cout << "insert record into matched block." << endl;
                         addRecord(hbs, record, iBits, true);
                         updateBlockSize(block,record);
                         updateBlockRecordCount(block);
                         updateBlockHashList(block,hbs);
                     } else {
-                        cout << "add a new block." << endl;
-                        numBlocks++;
+                        //numBlocks++;
                     }
                 }
             }
@@ -166,16 +153,12 @@ class LinearHashIndex {
         bool findBlock(string bits) {
             bool found = false;
             string temp, block;
-            cout << "check page directory for last: ";
-            cout << i << "bits of "<< bits << endl;
             for (vector<int>::iterator it = pageDirectory.begin();
                 it != pageDirectory.end(); ++it) {
                 temp = htobs(*it);
                 block = temp.substr(temp.length()-i, temp.length());
-                cout << "pd("<<*it<<"): "<< block << endl;
                 // block found
                 if (block.compare(bits) == 0) {
-                    cout << block << " == " << bits << endl;
                     found = true;
                     break;
                 }
@@ -187,7 +170,6 @@ class LinearHashIndex {
         // filename. eg: idx=1, then fn=0000000000000001.temp
         void createBlockFile(int idx) {
             string binstr = htobs(idx);
-            cout << "create block file " << binstr << ".block." << endl;
             stringstream str;
             fstream file;
 
@@ -209,9 +191,12 @@ class LinearHashIndex {
         void addRecord(string bs, Record &r, string bits, bool flipped) {
             // open the file
             fstream bf;
-            stringstream str;
+            stringstream ss;
             if (!flipped) {
-                str << bs << ".block";
+                bs+=".block";
+                //str << bs << ".block";
+                ss.str(bs);
+                cout<<"adding record to block"<<ss<<endl;
             } else {
                 // open the file matching the flipped bit in the bs
                 string temp = bs.substr(0,bs.length() - i);
@@ -222,14 +207,12 @@ class LinearHashIndex {
                     bitFlip.front() = '1';
                 }
                 temp += bitFlip;
-                str << bitFlip << ".block";
-                cout << "addRecord: bitFlip/bs = "<<bitFlip<<"/"<<bs<<endl;
+                temp += ".block";
+                ss.str(temp);
+                cout<<"adding record to block"<<ss<<endl;
             }
 
-            bf.open(str.str().c_str(), fstream::app);
-
-            cout << "ADD RECORD: ";
-            cout<<r.id<<","<<r.name<<","<<r.bio<<","<<r.manager_id<<endl;
+            bf.open(ss.str().c_str(), ios::app);
 
             bf<<r.id<<","<<r.name<<","<<r.bio<<","<<r.manager_id<<endl;
 
@@ -353,7 +336,6 @@ class LinearHashIndex {
         // line 2: number of records in block
         // line 3: csv of records
         void readBlockData(string filename, vector<string> &data) {
-            cout << "read file: " << filename << endl;
             ifstream ifs;
             ifs.open(filename, ios::in);
             string text;
@@ -366,7 +348,7 @@ class LinearHashIndex {
                     num++;
                 }
             } else {
-                cout << "Error opening file." << endl;
+                perror("Error opening file.");
             }
 
             ifs.close();
