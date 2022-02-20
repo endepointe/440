@@ -68,6 +68,7 @@ class LinearHashIndex {
 
             string hbs = htobs(createHash(record.id));
             string iBits = hbs.substr((hbs.length()) - i, i);
+            string block;
 
             cout << "hbs of " << record.id << " is " << hbs << endl;
             cout << "last " << i << " bits: " << iBits << endl;
@@ -85,7 +86,6 @@ class LinearHashIndex {
                 //open file check if there is space
                 //the loop is here to open the 16bit filename, filling
                 //the additional space with zeros to match correct file.
-                string block;
                 for (int i = 0; i < 16-iBits.length(); i++) {
                     block += "0";
                 }
@@ -135,10 +135,10 @@ class LinearHashIndex {
                     cout << "search again for flipped bit" << endl;
                     if (findBlock(bitFlip)) {
                         cout << "insert record into matched block." << endl;
+                        addRecord(hbs, record, iBits, true);
                         updateBlockSize(block,record);
                         updateBlockRecordCount(block);
                         updateBlockHashList(block,hbs);
-                        addRecord(hbs, record, iBits, true);
                     } else {
                         cout << "add a new block." << endl;
                         numBlocks++;
