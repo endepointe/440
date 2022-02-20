@@ -85,26 +85,30 @@ class LinearHashIndex {
                 //open file check if there is space
                 //the loop is here to open the 16bit filename, filling
                 //the additional space with zeros to match correct file.
-                string file;
+                string block;
                 for (int i = 0; i < 16-iBits.length(); i++) {
-                    file += "0";
+                    block += "0";
                 }
-                file += iBits;
-                file += ".temp";
-                cout << "open file: " << file << endl;
+                block += iBits;
+                block += ".block";
+                cout << "open block: " << block << endl;
                 //if there is space, insert record into block
                 vector<string> data;
-                readBlockData(file, data);
-                cout << "first line of " << file << " is " << data.at(0) << endl;
-                cout << "second line of " << file << " is " << data.at(1) << endl;
-                cout << "third line of " << file << " is " << data.at(2) << endl;
+                readBlockData(block, data);
+                cout << "first line of " << block << " is " << data.at(0) << endl;
+                cout << "second line of " << block << " is " << data.at(1) << endl;
+                cout << "third line of " << block << " is " << data.at(2) << endl;
                 cout << data.at(0) << " / " << PAGE_SIZE << " = ";
                 cout << (float)(stoi(data.at(0)) + record.size) / (float)(PAGE_SIZE) << endl;
                 // if the current block size + new record size are <
                 // PAGE_SIZE, add the record to the block.
-                if (((float)(stoi(data.at(0))+record.size) < (float)(PAGE_SIZE))) {
-                    //addRecord(hbs, record, false);
-                    //update block
+                if (((float)(stoi(data.at(0))+record.size) <
+                            (float)(PAGE_SIZE))) {
+                    addRecord(hbs, record, iBits, false);
+                    updateBlockSize(block,record);
+                    updateBlockRecordCount(block);
+                    updateBlockHashList(block,hbs);
+                    cout << "add record to block: " << block << endl;
                 } else {
                     // create an overflow block.
                     // For now, just add the records until
@@ -131,7 +135,10 @@ class LinearHashIndex {
                     cout << "search again for flipped bit" << endl;
                     if (findBlock(bitFlip)) {
                         cout << "insert record into matched block." << endl;
-                        //addRecord(hbs, record, true);
+                        updateBlockSize(block,record);
+                        updateBlockRecordCount(block);
+                        updateBlockHashList(block,hbs);
+                        addRecord(hbs, record, iBits, true);
                     } else {
                         cout << "add a new block." << endl;
                         numBlocks++;
@@ -180,11 +187,11 @@ class LinearHashIndex {
         // filename. eg: idx=1, then fn=0000000000000001.temp
         void createBlockFile(int idx) {
             string binstr = htobs(idx);
-            cout << "create temp file " << binstr << ".temp." << endl;
+            cout << "create block file " << binstr << ".block." << endl;
             stringstream str;
             fstream file;
 
-            str << binstr << ".temp";
+            str << binstr << ".block";
             file.open(str.str().c_str(), fstream::out);
 
             // write starting block size of 0 to line 1
@@ -192,93 +199,58 @@ class LinearHashIndex {
             // and the csv of hashvalues as binary strings on line 3
             file << 0 << endl;
             file << 0 << endl;
-            file << "" << endl;
+            file << endl;
 
             file.close();
         }
 
         // the pageDirectory block has already been found.
         // just open the file
-        void addRecord(string bs, Record &r, bool flipped) {
+        void addRecord(string bs, Record &r, string bits, bool flipped) {
             // open the file
             fstream bf;
             stringstream str;
             if (!flipped) {
-                str << bs << ".temp";
+                str << bs << ".block";
             } else {
                 // open the file matching the flipped bit in the bs
-                string bitFlip = bs;
+                string temp = bs.substr(0,bs.length() - i);
+                string bitFlip = bits;
                 if (bs.front() == '1') {
                     bitFlip.front() = '0';
                 } else {
                     bitFlip.front() = '1';
                 }
-                str << bitFlip << ".temp";
+                temp += bitFlip;
+                str << bitFlip << ".block";
                 cout << "addRecord: bitFlip/bs = "<<bitFlip<<"/"<<bs<<endl;
             }
 
-            bf.open(str.str().c_str(), fstream::out);
+            bf.open(str.str().c_str(), fstream::app);
+
+            cout << "ADD RECORD: ";
+            cout<<r.id<<","<<r.name<<","<<r.bio<<","<<r.manager_id<<endl;
 
             bf<<r.id<<","<<r.name<<","<<r.bio<<","<<r.manager_id<<endl;
 
             bf.close();
         }
 
-        // update the record header (the top 3 lines) with the
-        // new data:
-        // 1 size
-        // 2 count
-        // 3 csv of records
-        void updateBlockData(string filename, Record &record) {
-            ifstream ifs;
-            ofstream ofs;
-            ifs.open(filename);
-            ofs.open("_del_");
-            string line;
-            int size, count;
-
-            getline(ifs,line);
-            size = stoi(line);
-            getline(ifs,line);
-            count = stoi(line);
-
-            // update line 1 of block file
-            size += record.size;
-            count++;
-
-            ofs << size << endl;
-            ofs << count << endl;
-            ofs << ifs.rdbuf();
-
-            ofs.close();
-            ifs.close();
-
-            if (remove(filename.c_str()) != 0) {
-                perror("Error deleting file.");
-            } else {
-                rename("_del_", filename.c_str());
-            }
-        }
-
+        // update line 1 of block file
         void updateBlockSize(string filename, Record &record) {
             ifstream ifs;
             ofstream ofs;
             ifs.open(filename);
             ofs.open("_del_");
             string line;
-            int size, count;
+            int size;
 
             getline(ifs,line);
             size = stoi(line);
-            getline(ifs,line);
-            count = stoi(line);
 
-            // update line 1 of block file
             size += record.size;
-            count++;
 
             ofs << size << endl;
-            ofs << count << endl;
             ofs << ifs.rdbuf();
 
             ofs.close();
@@ -291,7 +263,8 @@ class LinearHashIndex {
             }
         }
 
-        void updateBlockRecordCount(string filename, Record &record) {
+        // update line 2 of block file
+        void updateBlockRecordCount(string filename) {
             ifstream ifs;
             ofstream ofs;
             ifs.open(filename);
@@ -304,8 +277,6 @@ class LinearHashIndex {
             getline(ifs,line);
             count = stoi(line);
 
-            // update line 1 of block file
-            size += record.size;
             count++;
 
             ofs << size << endl;
@@ -321,6 +292,62 @@ class LinearHashIndex {
                 rename("_del_", filename.c_str());
             }
         }
+
+        // update line 3 of block file
+        void updateBlockHashList(string filename, string recordHash) {
+            ifstream ifs;
+            ofstream ofs;
+            ifs.open(filename);
+            ofs.open("_del_");
+
+            string line,hash;
+            int size, count;
+            stringstream ss;
+            vector<string> h;
+
+            // line 1
+            getline(ifs,line);
+            size = stoi(line);
+
+            // line 2
+            getline(ifs,line);
+            count = stoi(line);
+
+            // line 3
+            while (getline(ifs, line)) {
+                ss << line;
+                while (getline(ss,hash,',')) {
+                    h.push_back(hash);
+                }
+                ss.clear();
+            }
+
+            h.push_back(recordHash);
+
+            ofs << size << endl;
+            ofs << count << endl;
+
+            for (vector<string>::iterator it = h.begin();
+                    it != h.end(); ++it) {
+                if (it != h.begin()) {
+                    ofs << ',';
+                }
+                ofs << *it;
+            }
+            ofs << endl;
+
+            ofs << ifs.rdbuf();
+
+            ofs.close();
+            ifs.close();
+
+            if (remove(filename.c_str()) != 0) {
+                perror("Error deleting file.");
+            } else {
+                rename("_del_", filename.c_str());
+            }
+        }
+
         // reads the block data of given filename:
         // line 1: size of block (must be < 4096 and < .7
         // line 2: number of records in block
