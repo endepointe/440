@@ -4,416 +4,491 @@
 #include <iostream>
 #include <sstream>
 #include <bitset>
+#include <cstdio>
+#include <assert.h>
 using namespace std;
 
+
+char* writeInt(char* buf, int v)
+{
+	int* p = (int*)buf;
+	*p = v;
+	++p;
+	return (char*)p;
+}
+
+
+char* readInt(char* buf, int& v)
+{
+	int* p = (int*)buf;
+	v = *p;
+	++p;
+	return (char*)p;
+}
+
+
+char* writeStr(char* buf, string& v)
+{
+	char* p = buf;
+	for (int i = 0; i < (int)v.length(); ++i) {
+		*p = v[i];
+		p++;
+	}
+	return (char*)p;
+}
+
+
+char* readStr(char* buf, int len, string& v)
+{
+	v = string(buf, len);
+	return (char*)buf + len;
+}
+
+
+
+struct DirHeader
+{
+	int numBlocks;
+	int block_size;
+	int nextFreePage;
+	int numRecords;
+	int i;
+};
+
+
+struct BlockHeader
+{
+	int next;
+	int bytes_left;
+};
+
+
 class Record {
-    public:
-        int id, manager_id; // fixed size of 8 bytes
-        string bio, name; // [0, 500], [0, 200] bytes
-        int size;
+public:
+	int id, manager_id;
+	std::string bio, name;
 
-        Record(vector<string> fields) {
-            id = stoi(fields[0]);
-            name = fields[1];
-            bio = fields[2];
-            manager_id = stoi(fields[3]);
-            size = 16 + bio.length() + name.length();
-        }
+	Record(vector<std::string> fields) {
+		id = stoi(fields[0]);
+		name = fields[1];
+		bio = fields[2];
+		manager_id = stoi(fields[3]);
+	}
 
-        void print() {
-            cout << "\tID: " << id << "\n";
-            cout << "\tNAME: " << name << "\n";
-            cout << "\tBIO: " << bio << "\n";
-            cout << "\tMANAGER_ID: " << manager_id << "\n";
-        }
+	Record()
+	{
+		id = manager_id = -1;
+	}
+
+	int getlen()
+	{
+		return 4 * sizeof(int) + (int)bio.length() + (int)name.length();
+	}
+
+	void write(char* buf)
+	{
+		buf = writeInt(buf, id);
+		buf = writeInt(buf, manager_id);
+		buf = writeInt(buf, (int)name.length());
+		buf = writeStr(buf, name);
+		buf = writeInt(buf, (int)bio.length());
+		buf = writeStr(buf, bio);
+	}
+
+	char* read(char* buf)
+	{
+		buf = readInt(buf, id);
+		buf = readInt(buf, manager_id);
+		int len = 0;
+		buf = readInt(buf, len);
+		buf = readStr(buf, len, name);
+		buf = readInt(buf, len);
+		buf = readStr(buf, len, bio);
+		return buf;
+	}
+
+	void print() {
+		cout << "\tID: " << id << "\n";
+		cout << "\tNAME: " << name << "\n";
+		cout << "\tBIO: " << bio << "\n";
+		cout << "\tMANAGER_ID: " << manager_id << "\n";
+	}
 };
 
 
 class LinearHashIndex {
 
-    private:
-        const int PAGE_SIZE = 4096;
+private:
+	const int PAGE_SIZE = 4096;
+	const double THRESHOLD = 0.5;
 
-        vector<int> pageDirectory;  // Where pageDirectory[h(id)] gives
-                                    // page index of block.
-                                    //
-                                    // can scan to pages using
-                                    // index*PAGE_SIZE
-                                    // as offset (using seek function)
-        int numBlocks; // n
-        int i; // the number of bits reqd to store numBlocks
-               // 2^(i-1) < numBlocks <= 2^(i)
-        int numRecords; // Records in index
-        int nextFreePage; // Next page to write to
-        float percentageFilled;
-        string fName;
+	vector<int> pageDirectory;  // Where pageDirectory[h(id)] gives page index of block
+								// can scan to pages using index*PAGE_SIZE as offset (using seek function)
+	int numBlocks; // n
+	int i;
+	int numRecords; // Records in index
+	int nextFreePage; // Next page to write to
+	int block_size;
+	string fName;
+	FILE* fp;
+	bool noExpand = false;
 
-        // Insert new record into index
-        void insertRecord(Record record) {
 
-            // No records written to index yet
-            if (numRecords == 0) {
-                // Initialize index with first blocks (start with 2)
-                numBlocks = 2;
-                // insert two blocks into the pageDirectory, 0 and 1
-                // and
-                // create files that represent blocks
-                for (int i = 0; i < numBlocks; i++) {
-                    pageDirectory.push_back(i);
-                    createBlockFile(pageDirectory.at(i));
-                }
-            }
+	int hashCode(int id)
+	{
+		return id % (1 << 16);
+	}
 
-            i = (int)(ceil(log2(numBlocks)));
 
-            string hbs = htobs(createHash(record.id));
-            string iBits = hbs.substr((hbs.length()) - i, i);
-            string block;
+	int search(int id)
+	{
+		int h = hashCode(id);
+		h &= (1 << i) - 1;
+		return h;
+	}
 
-            // if average number of records >= 70%, increment numBlocks
-            /*
-            if (percentageFilled >= .7) {
-                numBlocks++;
-                // reorder records within blocks
-            }
-            */
 
-            // scan pageDirectory for pageDirectory[i] == iBits
-            if (findBlock(iBits)) {
-                //open file check if there is space
-                //the loop is here to open the 16bit filename, filling
-                //the additional space with zeros to match correct file.
-                for (int i = 0; i < 16-iBits.length(); i++) {
-                    block += "0";
-                }
+	int alloc()
+	{
+		char* block = (char*)new char[block_size];
+		assert(block);
 
-                block += iBits;
-                block += ".block";
-                //if there is space, insert record into block
-                vector<string> data;
-                readBlockData(block, data);
-                // if the current block size + new record size are <
-                // PAGE_SIZE, add the record to the block.
-                if (((float)(stoi(data.at(0))+record.size) <
-                            (float)(PAGE_SIZE))) {
-                    addRecord(hbs, record, iBits, false);
-                    updateBlockSize(block,record);
-                    updateBlockRecordCount(block);
-                    updateBlockHashList(block,hbs);
-                } else {
-                    // create an overflow block.
-                    // For now, just add the records until
-                    // I have a better solution
+		memset(block, 0, block_size);
 
-                    // Current solution would be to keep the block size
-                    // < than PAGE_SIZE and just increment the number
-                    // of records in the block.
-                    // Then, to check if there was overflow, check if the
-                    // sum of the record.size of all records in
-                    // block >= PAGE_SIZE,
+		BlockHeader* h = (BlockHeader*)block;
+		h->next = -1;
+		h->bytes_left = block_size - sizeof(BlockHeader);
 
-                }
-            } else {
-                // flip the msb of the last i bits
-                if (bstoi(iBits) >= numBlocks) {
-                    string bitFlip = iBits;
-                    if (iBits.front() == '1') {
-                        bitFlip.front() = '0';
-                    } else {
-                        bitFlip.front() = '1';
-                    }
-                    if (findBlock(bitFlip)) {
-                        addRecord(hbs, record, iBits, true);
-                        updateBlockSize(block,record);
-                        updateBlockRecordCount(block);
-                        updateBlockHashList(block,hbs);
-                    } else {
-                        //numBlocks++;
-                    }
-                }
-            }
-        }
+		fseek(fp, nextFreePage * block_size, SEEK_SET);
 
-        int createHash(int id) {
-            return id % (int)(pow(2.0,16.0));
-        }
+		int ret = fwrite(block, block_size, 1, fp);
+		assert(ret == 1);
 
-        // converts a hash value to binary string
-        // only need 16 bits
-        string htobs(int hash) {
-            return bitset<16>(hash).to_string();
-        }
+		delete[] block;
+		return nextFreePage++;
+	}
 
-        // converts a binary string to an integer
-        int bstoi(string binary) {
-            return stoi(binary, nullptr, 2);
-        }
 
-        // scans pageDirectory for matching i bits
-        bool findBlock(string bits) {
-            bool found = false;
-            string temp, block;
-            for (vector<int>::iterator it = pageDirectory.begin();
-                it != pageDirectory.end(); ++it) {
-                temp = htobs(*it);
-                block = temp.substr(temp.length()-i, temp.length());
-                // block found
-                if (block.compare(bits) == 0) {
-                    found = true;
-                    break;
-                }
-            }
-            return found;
-        }
+	void insert(int& block, Record record)
+	{
+		if (block < 0) {
+			block = alloc();
+		}
 
-        // creates block file, using the idx to create a 16 bit
-        // filename. eg: idx=1, then fn=0000000000000001.temp
-        void createBlockFile(int idx) {
-            string binstr = htobs(idx);
-            stringstream str;
-            fstream file;
+		char* buf = (char*)new char[block_size];
+		assert(buf);
 
-            str << binstr << ".block";
-            file.open(str.str().c_str(), fstream::out);
+		fseek(fp, block * block_size, SEEK_SET);
 
-            // write starting block size of 0 to line 1
-            // the number of records in block on line 2
-            // and the csv of hashvalues as binary strings on line 3
-            file << 0 << endl;
-            file << 0 << endl;
-            file << endl;
+		int ret = fread(buf, block_size, 1, fp);
+		assert(ret == 1);
 
-            file.close();
-        }
+		int rlen = record.getlen();
 
-        // the pageDirectory block has already been found.
-        // just open the file
-        void addRecord(string bs, Record &r, string bits, bool flipped) {
-            // open the file
-            fstream bf;
-            stringstream ss;
-            if (!flipped) {
-                bs+=".block";
-                //str << bs << ".block";
-                ss.str(bs);
-                cout<<"adding record to block"<<ss<<endl;
-            } else {
-                // open the file matching the flipped bit in the bs
-                string temp = bs.substr(0,bs.length() - i);
-                string bitFlip = bits;
-                if (bs.front() == '1') {
-                    bitFlip.front() = '0';
-                } else {
-                    bitFlip.front() = '1';
-                }
-                temp += bitFlip;
-                temp += ".block";
-                ss.str(temp);
-                cout<<"adding record to block"<<ss<<endl;
-            }
+		BlockHeader* h = (BlockHeader*)buf;
+		if (h->bytes_left >= rlen) {
+			char* p = buf + block_size - h->bytes_left;
+			record.write(p);
+			h->bytes_left -= rlen;
 
-            bf.open(ss.str().c_str(), ios::app);
+			fseek(fp, block * block_size, SEEK_SET);
 
-            bf<<r.id<<","<<r.name<<","<<r.bio<<","<<r.manager_id<<endl;
+			ret = fwrite(buf, block_size, 1, fp);
+			assert(ret == 1);
 
-            bf.close();
-        }
+			delete[] buf;
+			return;
+		}
 
-        // update line 1 of block file
-        void updateBlockSize(string filename, Record &record) {
-            ifstream ifs;
-            ofstream ofs;
-            ifs.open(filename);
-            ofs.open("_del_");
-            string line;
-            int size;
+		bool needsave = false;
+		if (h->next < 0) {
+			needsave = true;
+		}
 
-            getline(ifs,line);
-            size = stoi(line);
+		insert(h->next, record);
 
-            size += record.size;
+		if (needsave) {
+			fseek(fp, block * block_size, SEEK_SET);
 
-            ofs << size << endl;
-            ofs << ifs.rdbuf();
+			ret = fwrite(buf, block_size, 1, fp);
+			assert(ret == 1);
+		}
 
-            ofs.close();
-            ifs.close();
+		delete[] buf;
+	}
 
-            if (remove(filename.c_str()) != 0) {
-                perror("Error deleting file.");
-            } else {
-                rename("_del_", filename.c_str());
-            }
-        }
 
-        // update line 2 of block file
-        void updateBlockRecordCount(string filename) {
-            ifstream ifs;
-            ofstream ofs;
-            ifs.open(filename);
-            ofs.open("_del_");
-            string line;
-            int size, count;
+	// Insert new record into index
+	void insertRecord(Record record) {
 
-            getline(ifs,line);
-            size = stoi(line);
-            getline(ifs,line);
-            count = stoi(line);
+		// Add record to the index in the correct block, creating overflow block if necessary
+		int idx = search(record.id);
+		if (idx < numBlocks) {
+			insert(pageDirectory[idx], record);
+		}
+		else {
+			idx &= ~(1 << (i - 1));
+			insert(pageDirectory[idx], record);
+		}
 
-            count++;
+		numRecords++;
 
-            ofs << size << endl;
-            ofs << count << endl;
-            ofs << ifs.rdbuf();
+		// Take neccessary steps if capacity is reached
+		double ratio = (double)nextFreePage / numBlocks;
+		if (ratio >= THRESHOLD) {
+			pageDirectory.push_back(-1);
+			numBlocks++;
 
-            ofs.close();
-            ifs.close();
+			if (!noExpand && numBlocks > (1 << i)) {
+				redist();
+			}
+		}
+	}
 
-            if (remove(filename.c_str()) != 0) {
-                perror("Error deleting file.");
-            } else {
-                rename("_del_", filename.c_str());
-            }
-        }
 
-        // update line 3 of block file
-        void updateBlockHashList(string filename, string recordHash) {
-            ifstream ifs;
-            ofstream ofs;
-            ifs.open(filename);
-            ofs.open("_del_");
+	Record searchRecord(int block, int id)
+	{
+		if (block < 0) return Record();
 
-            string line,hash;
-            int size, count;
-            stringstream ss;
-            vector<string> h;
+		char* buf = (char*)new char[block_size];
+		assert(buf);
 
-            // line 1
-            getline(ifs,line);
-            size = stoi(line);
+		fseek(fp, block * block_size, SEEK_SET);
 
-            // line 2
-            getline(ifs,line);
-            count = stoi(line);
+		int ret = fread(buf, block_size, 1, fp);
+		assert(ret == 1);
 
-            // line 3
-            while (getline(ifs, line)) {
-                ss << line;
-                while (getline(ss,hash,',')) {
-                    h.push_back(hash);
-                }
-                ss.clear();
-            }
+		BlockHeader* h = (BlockHeader*)buf;
+		char* s = buf + sizeof(BlockHeader);
+		char* e = buf + block_size - h->bytes_left;
 
-            h.push_back(recordHash);
+		while (s < e) {
+			Record r;
+			s = r.read(s);
 
-            ofs << size << endl;
-            ofs << count << endl;
+			if (r.id == id) {
+				delete[] buf;
+				return r;
+			}
+		}
 
-            for (vector<string>::iterator it = h.begin();
-                    it != h.end(); ++it) {
-                if (it != h.begin()) {
-                    ofs << ',';
-                }
-                ofs << *it;
-            }
-            ofs << endl;
+		int next = h->next;
+		delete[] buf;
 
-            ofs << ifs.rdbuf();
+		return searchRecord(next, id);
+	}
 
-            ofs.close();
-            ifs.close();
 
-            if (remove(filename.c_str()) != 0) {
-                perror("Error deleting file.");
-            } else {
-                rename("_del_", filename.c_str());
-            }
-        }
+	void redist()
+	{
+		LinearHashIndex I("tmp");
+		I.numBlocks = numBlocks;
+		I.i = i + 1;
+		I.numRecords = 0;
+		I.block_size = block_size;
+		I.nextFreePage = 0;
+		I.pageDirectory.resize(numBlocks, -1);
+		I.noExpand = true;
 
-        // reads the block data of given filename:
-        // line 1: size of block (must be < 4096 and < .7
-        // line 2: number of records in block
-        // line 3: csv of records
-        void readBlockData(string filename, vector<string> &data) {
-            ifstream ifs;
-            ifs.open(filename, ios::in);
-            string text;
-            int num = 0;
+		for (int j = 0; j < numBlocks; ++j) {
+			redist(pageDirectory[j], I);
+		}
 
-            if (ifs.is_open()) {
-                while (num < 3) {
-                    getline(ifs, text);
-                    data.push_back(text);
-                    num++;
-                }
-            } else {
-                perror("Error opening file.");
-            }
+		I.save();
+		fclose(fp);
+		fp = NULL;
+		//save();
 
-            ifs.close();
-        }
+		{
+			stringstream cmd;
+			cmd << "rm " << fName;
+			system(cmd.str().c_str());
+		}
 
-        void writeBlockSize(fstream &file, Record &r, int size) {
-            file << r.size + size << endl;
-        }
+		{
+			stringstream cmd;
+			cmd << "mv tmp " << fName;
+			system(cmd.str().c_str());
+		}
 
-        void writeRecordSize(fstream &file, Record &r, int size) {
+		load();
+	}
 
-        }
 
-    public:
-        LinearHashIndex(string indexFileName) {
-            numBlocks = 0;
-            i = 0;
-            numRecords = 0;
-            numBlocks = 0;
-            percentageFilled = 0.0;
-            fName = indexFileName;
-        }
+	void redist(int bid, LinearHashIndex& I)
+	{
+		if (bid < 0) return;
 
-        // Read csv file and add records to the index
-        void createFromFile(string csvFName) {
-            ifstream inF;
-            inF.open(csvFName);
+		char* buf = (char*)new char[block_size];
+		assert(buf);
 
-            if (!inF) {
-                cerr << "Cannot open file: " << csvFName << endl;
-            }
+		fseek(fp, bid * block_size, SEEK_SET);
 
-            vector<string> recordFields;
-            string line, field;
+		int ret = fread(buf, block_size, 1, fp);
+		assert(ret == 1);
 
-            while (getline(inF, line, '\n')) {
+		BlockHeader* h = (BlockHeader*)buf;
 
-                stringstream ss(line);
-                // id
-                getline(ss, field, ',');
-                recordFields.push_back(field);
-                // name
-                getline(ss, field, ',');
-                recordFields.push_back(field);
-                // bio
-                getline(ss, field, ',');
-                recordFields.push_back(field);
-                // manager_id
-                getline(ss, field, ',');
-                recordFields.push_back(field);
+		char* s = buf + sizeof(BlockHeader);
+		char* e = buf + block_size - h->bytes_left;
 
-                Record newRecord(recordFields);
-                insertRecord(newRecord);
+		while (s < e) {
+			Record r;
+			s = r.read(s);
 
-                recordFields.clear();
-            }
+			I.insertRecord(r);
+		}
 
-            inF.close();
-        }
+		int next = h->next;
+		delete[] buf;
 
-        // Given an ID, find the relevant record and print it
-        Record findRecordById(int id) {
-            // read max of 2 blocks, ideally 1 unless bit flip
+		redist(next, I);
+	}
 
-            // put the hashed values into a vector that
-            // matches the directory index key.
-        }
+
+public:
+	LinearHashIndex(string indexFileName) {
+		numBlocks = 0;
+		i = 0;
+		numRecords = 0;
+		block_size = 0;
+		fName = indexFileName;
+		nextFreePage = 0;
+		fp = NULL;
+		
+		load();
+	}
+
+	~LinearHashIndex()
+	{
+		save();
+	}
+
+
+	void load()
+	{
+		if (fp) return;
+		fp = fopen(fName.c_str(), "rb+");
+		if (!fp) {
+			fp = fopen(fName.c_str(), "wb");
+			assert(fp);
+			fclose(fp);
+
+			fp = fopen(fName.c_str(), "rb+");
+		}
+		assert(fp);
+
+		fseek(fp, 0, SEEK_END);
+		int flen = (int)ftell(fp);
+		if (flen == 0) {
+			block_size = PAGE_SIZE;
+			i = 1;
+			numBlocks = 2;
+			pageDirectory.resize(numBlocks, -1);
+		}
+		else {
+			assert(flen >= (int)sizeof(DirHeader));
+			fseek(fp, -(int)sizeof(DirHeader), SEEK_END);
+
+			DirHeader header;
+			int ret = fread(&header, sizeof(header), 1, fp);
+			assert(ret == 1);
+
+			numBlocks = header.numBlocks;
+			numRecords = header.numRecords;
+			nextFreePage = header.nextFreePage;
+			block_size = header.block_size;
+			i = header.i;
+			pageDirectory.clear();
+
+			int total = sizeof(DirHeader) + numBlocks * sizeof(int) + block_size * nextFreePage;
+			assert(flen == total);
+
+			fseek(fp, block_size * nextFreePage, SEEK_SET);
+
+			for (int j = 0; j < numBlocks; ++j) {
+				int block = -1;
+				int ret = fread(&block, sizeof(int), 1, fp);
+				assert(ret == 1);
+				assert((block >= 0 && block < nextFreePage) || block == -1);
+				pageDirectory.push_back(block);
+			}
+		}
+	}
+
+
+	void save()
+	{
+		if (!fp) return;
+
+		fseek(fp, block_size * nextFreePage, SEEK_SET);
+
+		for (int j = 0; j < numBlocks; ++j) {
+			int block = pageDirectory[j];
+			int ret = fwrite(&block, sizeof(int), 1, fp);
+			assert(ret == 1);
+		}
+
+		DirHeader header;
+		header.numBlocks = numBlocks;
+		header.numRecords = numRecords;
+		header.nextFreePage = nextFreePage;
+		header.block_size = block_size;
+		header.i = i;
+
+		int ret = fwrite(&header, sizeof(header), 1, fp);
+		assert(ret == 1);
+
+		fclose(fp);
+		fp = NULL;
+	}
+
+
+	// Read csv file and add records to the index
+	void createFromFile(string csvFName) {
+		FILE* fpp = fopen(csvFName.c_str(), "r");
+
+		char buf[10000];
+		while (fgets(buf, 10000, fpp)) {
+			Record r;
+			char* s = strtok(buf, ",");
+			assert(s);
+			r.id = atoi(s);
+			s = strtok(NULL, ",");
+			assert(s);
+			r.name = s;
+			s = strtok(NULL, ",");
+			assert(s);
+			r.bio = s;
+			s = strtok(NULL, ",");
+			assert(s);
+			r.manager_id = atoi(s);
+
+			Record r2 = findRecordById(r.id);
+			if (r2.id < 0) {
+				insertRecord(r);
+				
+
+				//r2 = findRecordById(r.id);
+			}
+			//printf("%d %d\n", ++id, this->numRecords);
+		}
+
+		fclose(fpp);
+	}
+
+	// Given an ID, find the relevant record and print it
+	Record findRecordById(int id) {
+		if (numBlocks == 0) return Record();
+
+		int idx = search(id);
+		if (idx < numBlocks) {
+			Record res = searchRecord(pageDirectory[idx], id);
+			if (res.id >= 0) return res;
+		}
+		idx &= ~(1 << (i - 1));
+		return searchRecord(pageDirectory[idx], id);
+	}
 };
+
+

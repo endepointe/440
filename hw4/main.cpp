@@ -1,7 +1,3 @@
-/*
-*Skeleton code for linear hash indexing
-*/
-
 #include <string>
 #include <ios>
 #include <fstream>
@@ -17,25 +13,39 @@ using namespace std;
 
 
 int main(int argc, char* const argv[]) {
+    bool cont = true;
+    string input;
+    int id;
+	// Create the index
+	LinearHashIndex emp_index("EmployeeIndex");
+	emp_index.createFromFile("Employee.csv");
+	emp_index.save();
+	emp_index.load();
 
-        // Create the index
-        LinearHashIndex emp_index("EmployeeIndex");
-        emp_index.createFromFile("Employee.csv");
-        //
-        // Loop to lookup IDs until user is ready to quit
-        return 0;
+	// Loop to lookup IDs until user is ready to quit
+    while (cont) {
+        try {
+            cout << "Enter Employee ID [(q)uit, exit]: ";
+            getline(cin, input);
+            id = stoi(input);
+            Record r = emp_index.findRecordById(id);
+            if (r.id < 0) {
+                printf("ID %d not found\n", id);
+            }
+            else {
+                r.print();
+            }
+        } catch (const invalid_argument &ia) {
+            if (input.compare("q") == 0 ||
+                input.compare("quit") == 0 ||
+                input.compare("exit") == 0) {
+                cont = false;
+            } else {
+                cout << "Not a valid entry." << endl;
+            }
+        }
+    }
+    cout << "EXITING..."<< endl;
+
+	return 0;
 }
-/*
- Questions:
- 1 - what does a single block read look like?
- 2 - What does the EmployeeIndex file look like?
- 3 - how is the variable length array supposed to look
-     after every insertion of a record?
-     are we supposed to alter it after every single insert?
-     variable length record lecture starts at 47:14 on jan 27
-
-     2a - improved block based nested loop - 160M
-     2b - optimized merge-sort join ~ 3k
-        - why not hash join
-*/
-
