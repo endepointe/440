@@ -1,7 +1,10 @@
-/* This is a skeleton code for Optimized Merge Sort, you can make modifications as long as you meet 
-   all question requirements*/  
-/* This record_class.h contains the class Records, which can be used to store tuples form Emp.csv (stored
-in the EmpRecords) and Dept.csv (Stored in DeptRecords) files.
+/* This is a skeleton code for Optimized Merge Sort,
+ * you can make modifications as long as you meet
+   all question requirements*/
+/* This record_class.h contains the class Records,
+ * which can be used to store tuples form Emp.csv
+ * (stored in the EmpRecords) and Dept.csv
+ * (Stored in DeptRecords) files.
 */
 #include <bits/stdc++.h>
 
@@ -9,7 +12,7 @@ using namespace std;
 
 class Records{
     public:
-    
+
     struct EmpRecord {
         int eid;
         string ename;
@@ -49,7 +52,8 @@ Records Grab_Emp_Record(fstream &empin) {
         getline(s, word, ',');
         emp.emp_record.salary = stod(word);
 
-        //Ensuring that you cannot use both structure (EmpEecord, DeptRecord) at the same memory block / time 
+        //Ensuring that you cannot use both structure
+        //(EmpEecord, DeptRecord) at the same memory block / time
         emp.dept_record.did = 0;
         emp.dept_record.dname = "";
         emp.dept_record.budget = 0;
@@ -78,7 +82,7 @@ Records Grab_Dept_Record(fstream &deptin) {
         getline(s, word, ',');
         dept.dept_record.managerid = stoi(word);
 
-        //Ensuring that you cannot use both structure (EmpEecord, DeptRecord) at the same memory block / time 
+        //Ensuring that you cannot use both structure (EmpEecord, DeptRecord) at the same memory block / time
         dept.emp_record.eid = 0;
         dept.emp_record.ename = "";
         dept.emp_record.age = 0;
@@ -88,5 +92,54 @@ Records Grab_Dept_Record(fstream &deptin) {
     } else {
         dept.no_values = -1;
         return dept;
+    }
+}
+
+void swap(Records* r1, Records* r2) {
+    Records r = *r1;
+    *r1 = *r2;
+    *r2 = r;
+}
+
+int emp_partition(Records records[], int low, int high) {
+    int pivot = records[high].emp_record.eid;
+    int i = (low - 1);
+
+    for (int j = low; j <= high - 1; j++) {
+        if (records[j].emp_record.eid < pivot) {
+            i++;
+            swap(&records[i], &records[j]);
+        }
+    }
+    swap(&records[i + 1], &records[high]);
+    return (i + 1);
+}
+
+int dept_partition(Records records[], int low, int high) {
+    int pivot = records[high].dept_record.managerid;
+    int i = (low - 1);
+
+    for (int j = low; j <= high - 1; j++) {
+        if (records[j].dept_record.managerid < pivot) {
+            i++;
+            swap(&records[i], &records[j]);
+        }
+    }
+    swap(&records[i + 1], &records[high]);
+    return (i + 1);
+}
+
+void quickSortEmp(Records records[], int low, int high) {
+    if (low < high) {
+        int pi = emp_partition(records, low, high);
+        quickSortEmp(records, low, pi - 1);
+        quickSortEmp(records, pi + 1, high);
+    }
+}
+void quickSortDept(Records records[], int low, int high) {
+    if (low < high) {
+        int pi = dept_partition(records, low, high);
+        quickSortDept(records, low, pi - 1);
+        quickSortDept(records, pi + 1, high);
     }
 }
