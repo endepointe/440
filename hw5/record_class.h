@@ -29,12 +29,16 @@ class Records{
 
     /*** You can add more variables if you want below ***/
 
-    int no_values = 0; //You can use this to check if you've don't have any more tuples
-    int number_of_emp_records = 0; // Tracks number of emp_records you have on the buffer
-    int number_of_dept_records = 0; //Track number of dept_records you have on the buffer
+    int no_values = 0; //You can use this to check if
+                       // you've don't have any more tuples
+    int number_of_emp_records = 0; // Tracks number of emp_records
+                                   // you have on the buffer
+    int number_of_dept_records = 0; // Track number of dept_records
+                                    // you have on the buffer
 };
 
-// Grab a single block from the Emp.csv file and put it inside the EmpRecord structure of the Records Class
+// Grab a single block from the Emp.csv file and put
+// it inside the EmpRecord structure of the Records Class
 Records Grab_Emp_Record(fstream &empin) {
     string line, word;
     Records emp;
