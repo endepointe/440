@@ -16,6 +16,7 @@ Records buffers[buffer_size]; //use this class object of size
 fstream emp_temp_files[buffer_size];
 fstream dept_temp_files[buffer_size];
 int emp_temp_files_count = 0, dept_temp_files_count = 0;
+int emp_count = 0, dept_count = 0;
 //fstream sorted_emp_temp_file;
 //fstream sorted_dept_temp_file;
 
@@ -108,38 +109,106 @@ void PrintJoin(fstream& join_file, Records& r, int i) {
     return;
 }
 
+void PrintEmp(Records& r)
+{
+    cout << r.emp_record.eid << ", ";
+    cout << r.emp_record.ename << ", ";
+    cout << r.emp_record.age << ", ";
+    cout << r.emp_record.salary << "\n";
+}
+
+void PrintDept(Records& r)
+{
+    cout << r.dept_record.did << ", ";
+    cout << r.dept_record.dname << ", ";
+    cout << r.dept_record.budget << ", ";
+    cout << r.dept_record.managerid << "\n";
+}
 //Use main memory to Merge and Join tuples
 //which are already sorted in 'runs' of the relations Dept and Emp
-void Merge_Join_Runs(fstream& sorted_emp_file){
+void Merge_Join_Runs(fstream& sorted_emp_file, fstream& sorted_dept_file){
 
-    for (int i = 0; i < emp_temp_files_count; i++)
+    for (int count = 0; count < emp_temp_files_count; count++)
     {
-        string empstr;
-        empstr = "emp" + to_string(i);
-        emp_temp_files[i].open(empstr, ios::in);
-        buffers[i] = Grab_Emp_Record(emp_temp_files[i]);
+            string empstr;
+            empstr = "emp" + to_string(count);
+            emp_temp_files[count].open(empstr, ios::in);
+    }
 
-        //while (buffers[i].no_values != -1)
-        while (true)
+    for (int count = 0; count < dept_temp_files_count; count++)
+    {
+            string deptstr;
+            deptstr = "dept" + to_string(count);
+            dept_temp_files[count].open(deptstr, ios::in);
+    }
+
+    // write out sorted_emp_file
+    int i = 0;
+    int idx = 0;
+    while (i < emp_count)
+    {
+        for (int j = 0; j < emp_temp_files_count; j++)
         {
-            int m = INT_MAX;
-            int idx = -1;
-
-            for (int i = 0; i < emp_temp_files_count; i++)
+            Records r = Grab_Emp_Record(emp_temp_files[j]);
+            if (r.no_values == -1)
             {
-                //if (buffers[i].emp_record.eid < 0) continue;
-                if (buffers[i].emp_record.eid < m)
-                {
-                    m = buffers[i].emp_record.eid;
-                    idx = i;
-                }
+                continue;
             }
 
-            //if (idx < 0) break;
-            if (buffers[i].no_values == -1) break;
-            Write_Emp(sorted_emp_file, buffers[idx]);
-            buffers[idx] = Grab_Emp_Record(emp_temp_files[idx]);
+            buffers[idx] = r;
+            idx++;
+            i++;
         }
+
+        if (idx == buffer_size)
+        {
+            quickSortEmp(buffers, 0, buffer_size - 1);
+            idx = 0;
+            for (int n = 0; n < buffer_size; n++)
+            {
+                Write_Emp(sorted_emp_file, buffers[n]);
+            }
+        }
+    }
+    // if there are records left in the buffer, write them out
+    for (int n = 0; n < idx; n++)
+    {
+        Write_Emp(sorted_emp_file, buffers[n]);
+    }
+
+
+    // write out sorted_dept_file
+    i = 0;
+    idx = 0;
+    while (i < dept_count)
+    {
+        for (int j = 0; j < dept_temp_files_count; j++)
+        {
+            Records r = Grab_Dept_Record(dept_temp_files[j]);
+            if (r.no_values == -1)
+            {
+                continue;
+            }
+
+            buffers[idx] = r;
+            idx++;
+            i++;
+        }
+
+        if (idx == buffer_size)
+        {
+            quickSortDept(buffers, 0, buffer_size - 1);
+            idx = 0;
+            for (int n = 0; n < buffer_size; n++)
+            {
+                Write_Dept(sorted_dept_file, buffers[n]);
+            }
+        }
+    }
+    // if there are records left in the buffer, write them out
+    for (int n = 0; n < idx; n++)
+    {
+        Write_Dept(sorted_dept_file, buffers[n]);
     }
 
     //and store the Joined new tuples using PrintJoin()
@@ -147,7 +216,6 @@ void Merge_Join_Runs(fstream& sorted_emp_file){
 }
 
 int main() {
-
     //Open file streams to read and write
     //Opening out two relations Emp.csv
     //and Dept.csv which we want to join
@@ -167,6 +235,7 @@ int main() {
 
     while (r.no_values != -1)
     {
+        emp_count++;
         buffers[i].emp_record = r.emp_record;
         i++;
         if (i == buffer_size)
@@ -183,6 +252,7 @@ int main() {
 
     while (r.no_values != -1)
     {
+        dept_count++;
         buffers[i].dept_record = r.dept_record;
         i++;
         if (i == buffer_size)
@@ -199,10 +269,12 @@ int main() {
 
     //2. Use Merge_Join_Runs() to Join the runs of Dept and Emp relations
 
-    fstream sorted_emp_temp_file;
+    fstream sorted_emp_temp_file, sorted_dept_temp_file;
     sorted_emp_temp_file.open("sorted_emp_temp_file", ios::out | ios::app);
-    Merge_Join_Runs(sorted_emp_temp_file);
-    //sorted_emp_temp_file.close();
+    sorted_dept_temp_file.open("sorted_dept_temp_file", ios::out | ios::app);
+    Merge_Join_Runs(sorted_emp_temp_file, sorted_dept_temp_file);
+    sorted_emp_temp_file.close();
+    sorted_dept_temp_file.close();
 
 
     //Please delete the temporary files (runs) after you've joined both Emp.csv and Dept.csv
