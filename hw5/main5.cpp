@@ -18,11 +18,6 @@ fstream emp_temp_files[buffer_size];
 fstream dept_temp_files[buffer_size];
 int emp_temp_files_count = 0, dept_temp_files_count = 0;
 int emp_count = 0, dept_count = 0;
-//fstream sorted_emp_temp_file;
-//fstream sorted_dept_temp_file;
-
-bool all_emp_records_read = false;
-bool all_dept_records_read = false;
 
 void Write_Emp(fstream& of, Records& emp)
 {
@@ -227,23 +222,20 @@ void Merge_Join_Runs(fstream& joinfile){
         if (e.emp_record.eid < d.dept_record.managerid)
         {
             // grab the next record in emp file
-            //e = Grab_Emp_Record(sorted_emp_temp_file);
-            Records te = e;
-            if (te.no_values != -1)
-            {
-                e = Grab_Emp_Record(sorted_emp_temp_file);
-            }
+            e = Grab_Emp_Record(sorted_emp_temp_file);
         }
 
         if (e.emp_record.eid > d.dept_record.managerid)
         {
             // grab the next record in dept file
-            Records td = d;
+            Records td = Grab_Dept_Record(sorted_dept_temp_file);
             if (td.no_values != -1)
             {
-                d = Grab_Dept_Record(sorted_dept_temp_file);
+                d = td;
             }
             else {
+                // if there are no more dept records,
+                // try to check the next emp record
                 Records te = e;
                 if (te.no_values != -1)
                 {
@@ -256,14 +248,15 @@ void Merge_Join_Runs(fstream& joinfile){
         {
             PrintJoin(joinfile,e,d);
             // grab the next record in dept file
-            Records td = d;
+            Records td = Grab_Dept_Record(sorted_dept_temp_file);
             if (td.no_values != -1)
             {
-                d = Grab_Dept_Record(sorted_dept_temp_file);
+                d = td;
             }
             else {
-                Records te = e;
-                if (te.no_values != -1)
+                // if there are no more dept records
+                // try to check the next emp record
+                if (e.no_values != -1)
                 {
                     e = Grab_Emp_Record(sorted_emp_temp_file);
                 }
@@ -334,17 +327,22 @@ int main() {
 
     joinout.close();
 
-    //Please delete the temporary files (runs) after you've joined both Emp.csv and Dept.csv
+    //Please delete the temporary files (runs)
+    //after you've joined both Emp.csv and Dept.csv
 
     for (int i = 0; i < emp_temp_files_count; i++) {
         string str = "emp" + to_string(i);
-        //unlink(str.c_str());
+        unlink(str.c_str());
     }
 
     for (int i = 0; i < dept_temp_files_count; i++) {
         string str = "dept" + to_string(i);
-        //unlink(str.c_str());
+        unlink(str.c_str());
     }
+    string temps = "sorted_emp_temp_file";
+    unlink(temps.c_str());
+    temps = "sorted_dept_temp_file";
+    unlink(temps.c_str());
 
     return 0;
 }

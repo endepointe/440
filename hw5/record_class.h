@@ -70,7 +70,8 @@ Records Grab_Emp_Record(fstream &empin) {
     }
 }
 
-// Grab a single block from the Dept.csv file and put it inside the DeptRecord structure of the Records Class
+// Grab a single block from the Dept.csv file and put
+// it inside the DeptRecord structure of the Records Class
 Records Grab_Dept_Record(fstream &deptin) {
     string line, word;
     //DeptRecord dept;
@@ -86,7 +87,8 @@ Records Grab_Dept_Record(fstream &deptin) {
         getline(s, word, ',');
         dept.dept_record.managerid = stoi(word);
 
-        //Ensuring that you cannot use both structure (EmpEecord, DeptRecord) at the same memory block / time
+        //Ensuring that you cannot use both structure
+        //(EmpEecord, DeptRecord) at the same memory block / time
         dept.emp_record.eid = 0;
         dept.emp_record.ename = "";
         dept.emp_record.age = 0;
