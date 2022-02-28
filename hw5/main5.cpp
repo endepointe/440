@@ -13,6 +13,7 @@ using namespace std;
 
 Records buffers[buffer_size]; //use this class object of size
                               //22 as your main memory
+fstream sorted_emp_temp_file, sorted_dept_temp_file;
 fstream emp_temp_files[buffer_size];
 fstream dept_temp_files[buffer_size];
 int emp_temp_files_count = 0, dept_temp_files_count = 0;
@@ -39,18 +40,6 @@ void Write_Dept(fstream& of, Records& dept)
     of << dept.dept_record.managerid << endl;
 }
 
-void Write_Emp_Join_Dept(fstream& of, Records& r)
-{
-    of << r.dept_record.managerid << ", ";
-    of << r.dept_record.did << ",";
-    of << r.dept_record.dname << ",";
-    of << r.dept_record.budget << ",";
-    //of << emp.emp_record.eid << ",";
-    of << r.emp_record.ename << ",";
-    of << r.emp_record.age << ",";
-    of << r.emp_record.salary << endl;
-
-}
 /***You can change return type and arguments as you want.***/
 
 //Sorting the buffers in main_memory and storing the sorted
@@ -104,11 +93,18 @@ void Sort_Buffer(string bname, int end){
 //Prints out the attributes from empRecord and deptRecord
 //when a join condition is met
 //and puts it in file Join.csv
-void PrintJoin(fstream& join_file, Records& r, int i) {
-    //Write_Emp_Join_Dept(join_file, r[i]);
-    return;
-}
+void PrintJoin(fstream& of, Records& er, Records& dr)
+{
+    of << dr.dept_record.managerid << ", ";
+    of << dr.dept_record.did << ",";
+    of << dr.dept_record.dname << ",";
+    of << dr.dept_record.budget << ",";
+    //of << emp.emp_record.eid << ",";
+    of << er.emp_record.ename << ",";
+    of << er.emp_record.age << ",";
+    of << er.emp_record.salary << endl;
 
+}
 void PrintEmp(Records& r)
 {
     cout << r.emp_record.eid << ", ";
@@ -126,7 +122,10 @@ void PrintDept(Records& r)
 }
 //Use main memory to Merge and Join tuples
 //which are already sorted in 'runs' of the relations Dept and Emp
-void Merge_Join_Runs(fstream& sorted_emp_file, fstream& sorted_dept_file){
+void Merge_Join_Runs(fstream& joinfile){
+
+    sorted_emp_temp_file.open("sorted_emp_temp_file", ios::out | ios::app);
+    sorted_dept_temp_file.open("sorted_dept_temp_file", ios::out | ios::app);
 
     for (int count = 0; count < emp_temp_files_count; count++)
     {
@@ -166,14 +165,14 @@ void Merge_Join_Runs(fstream& sorted_emp_file, fstream& sorted_dept_file){
             idx = 0;
             for (int n = 0; n < buffer_size; n++)
             {
-                Write_Emp(sorted_emp_file, buffers[n]);
+                Write_Emp(sorted_emp_temp_file, buffers[n]);
             }
         }
     }
     // if there are records left in the buffer, write them out
     for (int n = 0; n < idx; n++)
     {
-        Write_Emp(sorted_emp_file, buffers[n]);
+        Write_Emp(sorted_emp_temp_file, buffers[n]);
     }
 
 
@@ -201,17 +200,80 @@ void Merge_Join_Runs(fstream& sorted_emp_file, fstream& sorted_dept_file){
             idx = 0;
             for (int n = 0; n < buffer_size; n++)
             {
-                Write_Dept(sorted_dept_file, buffers[n]);
+                Write_Dept(sorted_dept_temp_file, buffers[n]);
             }
         }
     }
     // if there are records left in the buffer, write them out
     for (int n = 0; n < idx; n++)
     {
-        Write_Dept(sorted_dept_file, buffers[n]);
+        Write_Dept(sorted_dept_temp_file, buffers[n]);
     }
 
+    sorted_emp_temp_file.close();
+    sorted_dept_temp_file.close();
+
     //and store the Joined new tuples using PrintJoin()
+
+    sorted_emp_temp_file.open("sorted_emp_temp_file", ios::in);
+    sorted_dept_temp_file.open("sorted_dept_temp_file", ios::in);
+
+    Records e, d;
+    e = Grab_Emp_Record(sorted_emp_temp_file);
+    d = Grab_Dept_Record(sorted_dept_temp_file);
+
+    while (e.no_values != -1)
+    {
+        if (e.emp_record.eid < d.dept_record.managerid)
+        {
+            // grab the next record in emp file
+            //e = Grab_Emp_Record(sorted_emp_temp_file);
+            Records te = e;
+            if (te.no_values != -1)
+            {
+                e = Grab_Emp_Record(sorted_emp_temp_file);
+            }
+        }
+
+        if (e.emp_record.eid > d.dept_record.managerid)
+        {
+            // grab the next record in dept file
+            Records td = d;
+            if (td.no_values != -1)
+            {
+                d = Grab_Dept_Record(sorted_dept_temp_file);
+            }
+            else {
+                Records te = e;
+                if (te.no_values != -1)
+                {
+                    e = Grab_Emp_Record(sorted_emp_temp_file);
+                }
+            }
+        }
+
+        if (e.emp_record.eid == d.dept_record.managerid)
+        {
+            PrintJoin(joinfile,e,d);
+            // grab the next record in dept file
+            Records td = d;
+            if (td.no_values != -1)
+            {
+                d = Grab_Dept_Record(sorted_dept_temp_file);
+            }
+            else {
+                Records te = e;
+                if (te.no_values != -1)
+                {
+                    e = Grab_Emp_Record(sorted_emp_temp_file);
+                }
+            }
+        }
+    }
+
+    sorted_emp_temp_file.close();
+    sorted_dept_temp_file.close();
+
     return;
 }
 
@@ -268,14 +330,9 @@ int main() {
     deptin.close();
 
     //2. Use Merge_Join_Runs() to Join the runs of Dept and Emp relations
+    Merge_Join_Runs(joinout);
 
-    fstream sorted_emp_temp_file, sorted_dept_temp_file;
-    sorted_emp_temp_file.open("sorted_emp_temp_file", ios::out | ios::app);
-    sorted_dept_temp_file.open("sorted_dept_temp_file", ios::out | ios::app);
-    Merge_Join_Runs(sorted_emp_temp_file, sorted_dept_temp_file);
-    sorted_emp_temp_file.close();
-    sorted_dept_temp_file.close();
-
+    joinout.close();
 
     //Please delete the temporary files (runs) after you've joined both Emp.csv and Dept.csv
 
